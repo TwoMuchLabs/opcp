@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from opcp.runtime import evaluate_swap_evidence, evaluate_swap_evidence_file
+from opcp.evidence_service import evaluate_swap_evidence, evaluate_swap_evidence_file
 
 
 FIXTURE = Path(__file__).parents[1] / "examples" / "sme-credit-swap-drill.json"
