@@ -14,6 +14,7 @@ def test_runtime_boundary_evaluates_in_memory_fixture():
 
     assert result["promotion_ready"] is True
     assert result["decision"] == "passed"
+    assert result["blocking_reasons"] == []
 
 
 def test_runtime_boundary_matches_file_evaluator():
@@ -29,7 +30,10 @@ def test_runtime_boundary_blocks_failed_kyc_swap():
     assert result["decision"] == "failed"
     assert result["regression"]["total_cases"] == 6
     assert result["regression"]["passed_cases"] == 4
-    assert result["errors"]
+    assert "promotion gate failed: context_lease_unchanged" in result["blocking_reasons"]
+    assert "promotion gate failed: regression_pass" in result["blocking_reasons"]
+    assert "promotion gate failed: material_exception_regression" in result["blocking_reasons"]
+    assert result["errors"] == []
 
 
 def test_runtime_boundary_matches_blocked_file_evaluator():
