@@ -96,7 +96,13 @@ def evaluate_evidence(evidence: Mapping[str, Any]) -> dict[str, Any]:
 
     errors.extend(validate_swap_result(evidence))
 
-    passed = not errors and all(gates.get(name) is True for name in REQUIRED_GATES)
+    blocking_reasons = [
+        f"promotion gate failed: {name}"
+        for name in REQUIRED_GATES
+        if gates.get(name) is not True
+    ]
+
+    passed = not errors and not blocking_reasons
     return {
         "id": evidence.get("id"),
         "capability": evidence.get("capability"),
@@ -111,6 +117,7 @@ def evaluate_evidence(evidence: Mapping[str, Any]) -> dict[str, Any]:
             ),
         },
         "promotion_ready": passed,
+        "blocking_reasons": blocking_reasons,
         "errors": errors,
     }
 
