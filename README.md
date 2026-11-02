@@ -95,7 +95,7 @@ The demo shows the main ideas working together:
 
 OPCP must not become the next concentration risk, so its openness is built to be hard to reverse:
 
-- **Apache 2.0 for all of the project's own material**, including the specification. The R0–R4 classes it references are CC BY 4.0; see [NOTICE](NOTICE).
+- **Apache 2.0 for all of the project's own material**, including the specification. The R0–R4 classes it references come from the Reversibility Classes specification, also Apache 2.0; see [NOTICE](NOTICE).
 - **No contributor licence agreement.** Contributors keep their copyright, so no single party can relicense the project.
 - **Specification independent of implementation**, with public conformance tests.
 - **A stated path to a neutral foundation.**
