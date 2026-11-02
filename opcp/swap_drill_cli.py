@@ -1,7 +1,7 @@
 """Small CLI boundary for running OPCP v0.3 swap-drill evidence.
 
-This is intentionally a thin adapter over ``opcp.swap_drill`` so Soven and
-other control planes can invoke the same deterministic evaluator from a local
+This is intentionally a thin adapter over ``opcp.swap_drill`` so any control
+plane can invoke the same deterministic evaluator from a local
 process without importing private implementation details.
 """
 
