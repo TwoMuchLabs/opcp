@@ -8,8 +8,8 @@ Releases are built and published by GitHub Actions ([`.github/workflows/release.
 2. Write the release notes at `docs/releases/v<version>.md`. The workflow refuses to run without them.
 3. Merge to `main`.
 4. Start the release, in either of two ways:
-   - **From GitHub:** Actions → Release → Run workflow. Enter the tag (for example `v0.2.0`), tick or untick "pre-release", and tick "publish to PyPI" if wanted. The tag is created on `main` if it doesn't exist yet.
-   - **From a terminal:** `git tag v0.2.0 && git push origin v0.2.0`. This publishes the GitHub release (as a pre-release) but not PyPI.
+   - **From GitHub:** Actions → Release → Run workflow. Enter the tag (for example `v0.3.0`), tick or untick "pre-release", and tick "publish to PyPI" if wanted. The tag is created on `main` if it doesn't exist yet.
+   - **From a terminal:** `git tag v0.3.0 && git push origin v0.3.0`. This publishes the GitHub release (as a pre-release) but not PyPI.
 
 The workflow checks that the tag matches the package version, builds the package, runs the tests against the built wheel, and attaches five files to the release:
 
@@ -23,7 +23,7 @@ The workflow checks that the tag matches the package version, builds the package
 1. Sign in at [pypi.org](https://pypi.org). Turn on two-factor authentication if it isn't already on.
 2. Go to **Your projects → Publishing → Add a new pending publisher** and enter:
    - PyPI project name: `opcp`
-   - Owner: `waghmaredb` (change to the TwoMuchLabs organisation after the repository moves)
+   - Owner: `TwoMuchLabs`
    - Repository: `opcp`
    - Workflow name: `release.yml`
    - Environment name: `pypi`

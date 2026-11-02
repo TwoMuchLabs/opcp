@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+## 0.3.0 (draft) — 2026-11-02
+
+Supplier portability becomes something you can test, not just assess.
+
+- **Swap-drill specification** (`spec/SWAP-DRILL.md`, `schema/swap-drill.schema.json`). A normative companion to the specification. A drill runs a candidate supplier in shadow beside the incumbent on the same contract and business-owned regression cases. It passes only if all six gates hold: process, context lease and authority policy unchanged, contract conformance, regression cases passed, and no material exception (an expected fail or refer) turned into a pass. Gates are never averaged or traded off. Time-to-swap is reported in three parts, and a `proven` figure must carry a drill date. The spec lists the conformance fixtures every implementation must include.
+- **Swap-drill tools.** `opcp swap-drill <evidence.json>` evaluates a drill evidence record and reports the decision, whether the candidate is ready to promote, any errors and the regression counts. `opcp swap-demo` runs a shadow drill between two simulated suppliers and prints the resulting record. The evaluator is deterministic and has no dependency on any commercial product.
+- **Example process pack** (`examples/sme-credit-origination.yaml`, provisional) and a matching drill record (`examples/sme-credit-swap-drill.json`). The process-pack format is not yet normative.
 - **Sponsor readout** (`opcp scorecard readout`). A two-page, printable pack for the pilot's decision meeting. It shows a grid of every critical process against the seven measures, summary tiles (ratings, evidence coverage, proven swaps, largest supplier share), the decisions for the sponsor in order of urgency, and each renewing contract's last day to give notice (end date minus notice period). Release builds attach an example readout.
 - **OCEL 2.0 export** (`opcp ocel`, `docs/PROCESS-MINING.md`). Converts an exported event log to OCEL 2.0 JSON for process-mining tools. Requests, capabilities, processes and suppliers become objects, and each log entry becomes an event linked to them. No input or output values are exported unless the log holds them. Checked by reading the demo log with PM4Py's OCEL 2.0 reader.
+- **Fix:** the control plane now uses the event log it is given, even when that log is empty.
 
 ## 0.2.0 (draft) — 2026-10-24
 

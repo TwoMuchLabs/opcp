@@ -48,4 +48,4 @@ The project follows the [Contributor Covenant, version 2.1](https://www.contribu
 - [ ] Publication of the package on PyPI
 - [x] Project name: Open Process Control Plane (OPCP). Use the full name first; "OPCP" is also used by an unrelated OVHcloud product.
 - [ ] Formal trademark search for the name
-- [x] Public repository: https://github.com/waghmaredb/opcp (to move to the TwoMuchLabs organisation later)
+- [x] Public repository: https://github.com/TwoMuchLabs/opcp
