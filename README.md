@@ -67,6 +67,12 @@ Already filing an EU DORA register of information? `opcp scorecard export answer
 
 For each process: where the rules live, whether learned context can leave, whose permission model governs actions, supplier-only dependencies, contract exit terms, time-to-swap (contracting, onboarding and cutover, estimated or proven), and whether a fallback supplier exists. Each process is rated by its **weakest** measure, because an exit fails at its weakest point. Across critical processes, it shows the share each supplier serves and flags any above your concentration limit.
 
+## Building with OPCP
+
+- [Quick start](docs/QUICKSTART.md): run a capability call through a control plane, see the lease and the gate work, and check an adapter, in 15 minutes.
+- [Architecture](docs/ARCHITECTURE.md): how the parts fit, and what OPCP is not.
+- [Writing an adapter](docs/ADAPTERS.md) and [troubleshooting](docs/TROUBLESHOOTING.md).
+
 ## See the reference runtime
 
 ```bash

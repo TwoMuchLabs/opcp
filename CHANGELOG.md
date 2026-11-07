@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Developer guides.** `docs/QUICKSTART.md` (15 minutes, with a runnable example in `examples/quickstart/`), `docs/ARCHITECTURE.md` (the parts, the call sequence, what OPCP is not, and how it relates to adjacent work), `docs/ADAPTERS.md` and `docs/TROUBLESHOOTING.md`. `tests/test_docs_examples.py` checks that the example prints what the guide shows, that each "change something" step behaves as described, and that every error message quoted in the troubleshooting guide still exists in the code.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
