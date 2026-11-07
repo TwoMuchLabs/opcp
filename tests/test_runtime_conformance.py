@@ -75,7 +75,8 @@ def build(setup: dict) -> ControlPlane:
     gate = AuthorityGate(budgets=dict(g.get("budgets", {})), approver=approver,
                          overrides={k: RClass.parse(v) for k, v in g.get("overrides", {}).items()},
                          two_person_r4=g.get("two_person_r4", False))
-    return ControlPlane(contracts, adapters, routes, gate=gate, today=dt.date.fromisoformat(setup["today"]))
+    return ControlPlane(contracts, adapters, routes, gate=gate, today=dt.date.fromisoformat(setup["today"]),
+                        concentration_limit=setup.get("concentration_limit"))
 
 
 def observe(plane: ControlPlane, response) -> dict:
@@ -90,7 +91,7 @@ def observe(plane: ControlPlane, response) -> dict:
 
 
 def test_runtime_suite_is_present():
-    assert len(FIXTURES) >= 20
+    assert len(FIXTURES) >= 38
 
 
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.stem)
