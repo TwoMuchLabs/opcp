@@ -1,0 +1,59 @@
+{
+  "opcp_version": "0.3",
+  "id": "swap-kyc-document-review-2026-10-31",
+  "capability": "document-understanding",
+  "incumbent_supplier": "supplier-a",
+  "candidate_supplier": "supplier-c",
+  "execution": {
+    "mode": "shadow",
+    "customer_visible": false,
+    "authority_effects_applied": false
+  },
+  "invariants": {
+    "process": {
+      "incumbent_revision": "kyc-document-review:2.0",
+      "candidate_revision": "kyc-document-review:2.0",
+      "unchanged": true
+    },
+    "context_lease": {
+      "incumbent_revision": "document-understanding:lease-4",
+      "candidate_revision": "document-understanding:lease-5",
+      "unchanged": false
+    },
+    "authority_policy": {
+      "incumbent_revision": "kyc-authority:3",
+      "candidate_revision": "kyc-authority:3",
+      "unchanged": true
+    }
+  },
+  "promotion_gates": {
+    "process_unchanged": true,
+    "context_lease_unchanged": false,
+    "authority_policy_unchanged": true,
+    "contract_conformance": true,
+    "regression_pass": false,
+    "material_exception_regression": false
+  },
+  "regression": {
+    "total_cases": 6,
+    "passed_cases": 4,
+    "failed_cases": 2,
+    "cases": [
+      {"case_id": "kyc-01", "expected": "pass", "incumbent": "pass", "candidate": "pass", "incumbent_confidence": 0.98, "candidate_confidence": 0.97, "passed": true},
+      {"case_id": "kyc-02", "expected": "pass", "incumbent": "pass", "candidate": "pass", "incumbent_confidence": 0.96, "candidate_confidence": 0.95, "passed": true},
+      {"case_id": "kyc-03", "expected": "refer", "incumbent": "refer", "candidate": "pass", "incumbent_confidence": 0.88, "candidate_confidence": 0.93, "passed": false},
+      {"case_id": "kyc-04", "expected": "fail", "incumbent": "fail", "candidate": "fail", "incumbent_confidence": 0.99, "candidate_confidence": 0.98, "passed": true},
+      {"case_id": "kyc-05", "expected": "pass", "incumbent": "pass", "candidate": "pass", "incumbent_confidence": 0.94, "candidate_confidence": 0.93, "passed": true},
+      {"case_id": "kyc-06", "expected": "refer", "incumbent": "refer", "candidate": "pass", "incumbent_confidence": 0.84, "candidate_confidence": 0.91, "passed": false}
+    ]
+  },
+  "time_to_swap": {
+    "contracting_days": 0,
+    "onboarding_days": 0,
+    "technical_cutover_days": 0,
+    "confidence": "estimated"
+  },
+  "started_at": "2026-10-31T00:00:00+00:00",
+  "completed_at": "2026-10-31T00:00:01+00:00",
+  "decision": "failed"
+}
