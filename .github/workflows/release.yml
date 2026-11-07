@@ -1,21 +1,30 @@
 name: Release
 
-# Runs when a version tag is pushed (git tag v0.2.0 && git push origin v0.2.0),
+# Runs when a version tag is pushed (git tag v0.3.1 && git push origin v0.3.1),
 # or by hand from the Actions tab ("Run workflow") with an existing or new tag.
+#
+# Every job is safe to re-run. The order is chosen so that the only irreversible step,
+# the PyPI upload, runs last:
+#   prepare -> build -> github-release -> pypi
+# See docs/RELEASING.md for what a re-run does at each stage.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release, e.g. v0.2.0 (created on main if it does not exist)"
+        description: "Tag to release, e.g. v0.3.1 (created on main if it does not exist)"
         required: true
       prerelease:
-        description: "Mark as a pre-release"
+        description: "Mark as a pre-release (only when the release is first created)"
         type: boolean
         default: true
       publish_pypi:
-        description: "Also publish to PyPI (needs the trusted publisher set up, see docs/RELEASING.md)"
+        description: "Also publish to PyPI (skipped if the version is already there; see docs/RELEASING.md)"
+        type: boolean
+        default: false
+      update_notes:
+        description: "If the release already exists, replace its notes with docs/releases/<tag>.md"
         type: boolean
         default: false
 
@@ -25,35 +34,78 @@ permissions:
 env:
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
+# Two runs for the same tag must not race to create the same release.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
-  build:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.check.outputs.version }}
+      notes: ${{ steps.check.outputs.notes }}
+      sha: ${{ steps.target.outputs.sha }}
+      pypi_exists: ${{ steps.pypi.outputs.pypi_exists }}
     steps:
+      - name: Resolve the commit to release
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          # An existing tag decides the commit; a run never rebuilds a tag from another commit.
+          if sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null) \
+             && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG exists at $sha"
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ "$REF" = "refs/heads/main" ]; then
+            sha="$GITHUB_SHA"
+            echo "Tag $TAG does not exist; it will be created at main $sha"
+          else
+            echo "::error::Tag $TAG does not exist, and new tags are created only by a manual run on main"; exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check the tag matches the package version
-        id: version
-        run: |
-          version=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if [ "v$version" != "$TAG" ]; then
-            echo "::error::Tag $TAG does not match pyproject version $version"; exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Check tag, versions, changelog and release notes
+        id: check
+        run: python tools/release.py preflight --tag "$TAG"
+      - name: Check whether this version is already on PyPI
+        id: pypi
+        run: python tools/release.py pypi-status --version "${{ steps.check.outputs.version }}"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Build
         run: |
+          # Pin file timestamps to the commit so rebuilds of the same commit are byte-identical.
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           python -m pip install --upgrade pip build
           python -m build
+      - name: Use the PyPI files if this version is already published
+        if: needs.prepare.outputs.pypi_exists == 'true'
+        run: python tools/release.py reconcile-dist --version "${{ needs.prepare.outputs.version }}" --dist dist
       - name: Test the built wheel
         run: |
           pip install dist/*.whl pytest
-          pytest -q
+          # tests/test_installed_wheel.py fails if the tests import the source tree instead.
+          OPCP_EXPECT_INSTALLED=1 pytest -q -p no:cacheprovider
       - name: Build the downloadable form and example report
         run: |
-          v=${{ steps.version.outputs.version }}
+          v=${{ needs.prepare.outputs.version }}
           mkdir -p assets
           opcp scorecard form "assets/opcp-exit-readiness-form-$v.html"
           opcp scorecard run examples/example-bank-answers.yaml -o "assets/opcp-example-report-$v.html"
@@ -69,31 +121,36 @@ jobs:
           path: dist/
 
   github-release:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: release-assets
           path: assets
-      - name: Create the release
+      - name: Create the release, or refresh its assets
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ github.event.inputs.prerelease || 'true' }}
+          UPDATE_NOTES: ${{ github.event.inputs.update_notes || 'false' }}
         run: |
-          notes="docs/releases/$TAG.md"
-          [ -f "$notes" ] || { echo "::error::Missing release notes at $notes"; exit 1; }
-          flags=""
-          [ "$PRERELEASE" = "true" ] && flags="--prerelease"
-          gh release create "$TAG" assets/* --target "$GITHUB_SHA" \
-            --title "OPCP $TAG" --notes-file "$notes" $flags
+          python tools/release.py github-release \
+            --repo "$GITHUB_REPOSITORY" --tag "$TAG" --sha "${{ needs.prepare.outputs.sha }}" \
+            --notes "${{ needs.prepare.outputs.notes }}" \
+            --prerelease "$PRERELEASE" --update-notes "$UPDATE_NOTES" \
+            assets/*
 
   pypi:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true'
+    needs: [prepare, build, github-release]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.publish_pypi == 'true' &&
+      needs.prepare.outputs.pypi_exists != 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
