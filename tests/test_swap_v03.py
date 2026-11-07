@@ -39,7 +39,6 @@ def test_process_revision_change_blocks_promotion():
         incumbent="supplier-a",
         candidate="supplier-b",
         cases=[SwapCase("clean", "pass", "pass", "pass")],
-        process_unchanged=False,
         process_incumbent_revision="process:17",
         process_candidate_revision="process:18",
     )
@@ -47,7 +46,38 @@ def test_process_revision_change_blocks_promotion():
     assert not result.passed
     evidence = result.evidence()
     assert evidence["decision"] == "failed"
+    assert evidence["promotion_gates"]["process_unchanged"] is False
     assert not validate(evidence)
+
+
+def test_context_lease_revision_change_blocks_promotion():
+    result = evaluate_swap(
+        capability="verify-identity",
+        incumbent="supplier-a",
+        candidate="supplier-b",
+        cases=[SwapCase("clean", "pass", "pass", "pass")],
+        context_lease_incumbent_revision="context-lease:17",
+        context_lease_candidate_revision="context-lease:18",
+    )
+
+    assert not result.passed
+    evidence = result.evidence()
+    assert evidence["promotion_gates"]["context_lease_unchanged"] is False
+
+
+def test_authority_policy_revision_change_blocks_promotion():
+    result = evaluate_swap(
+        capability="verify-identity",
+        incumbent="supplier-a",
+        candidate="supplier-b",
+        cases=[SwapCase("clean", "pass", "pass", "pass")],
+        authority_policy_incumbent_revision="authority-policy:17",
+        authority_policy_candidate_revision="authority-policy:18",
+    )
+
+    assert not result.passed
+    evidence = result.evidence()
+    assert evidence["promotion_gates"]["authority_policy_unchanged"] is False
 
 
 def test_shadow_drill_cannot_apply_authority_effects():
