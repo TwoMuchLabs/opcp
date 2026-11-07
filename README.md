@@ -108,6 +108,9 @@ Deepak Waghmare and Shaad Sufi, with contributors.
 
 ## Contributing
 
+The [community programme](docs/community/README.md) covers how to make a first contribution, how specification changes are reviewed, external review rounds and the path to becoming a maintainer.
+
+
 Operations, risk, legal and procurement expertise is as welcome as code. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contact

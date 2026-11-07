@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Community programme (proposed).** `docs/community/` covers the RFC process, contributing step by step (including AI-assisted contributions), external technical review rounds, the path to becoming a maintainer, and an organisational diversity roadmap. Issue templates for RFCs and external review findings. Nothing in GOVERNANCE.md changes; proposals that would change it are marked.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
