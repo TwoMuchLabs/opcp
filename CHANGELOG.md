@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fix: schema formats are checked the same way on every machine.** `date-time`, `time`, `uri` and `uri-reference` were only checked where optional packages happened to be installed, and `time` used draft-3 rules. OPCP now always asserts a fixed list of formats (`opcp._io.ENFORCED_FORMATS`) with draft 2020-12 semantics, adds two small MIT-licensed dependencies (`rfc3339-validator`, `rfc3986-validator`) to do so, and treats any other format as an annotation everywhere. Documents with free-text timestamps, such as a swap-drill `started_at` of "yesterday", are now rejected.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
