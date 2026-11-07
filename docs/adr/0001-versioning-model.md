@@ -1,6 +1,6 @@
 # ADR 0001: Versioning model for the package, the specification and document formats
 
-- **Status:** Proposed. Needs a maintainer decision. Option B below requires a normative change to `spec/SPEC.md`, which must go through the 14-day review in [GOVERNANCE.md](../../GOVERNANCE.md) section 3.
+- **Status:** Proposed. On 2026-11-07 the maintainers chose **option B** to take to public review. The normative text is in the follow-up pull request, which stays open for at least 14 days ([GOVERNANCE.md](../../GOVERNANCE.md) section 3). This record becomes Accepted when that pull request merges.
 - **Date:** 2026-11-07
 - **Deciders:** the maintainers listed in GOVERNANCE.md
 

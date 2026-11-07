@@ -1,6 +1,7 @@
-# Supplier Swap Drill — OPCP v0.3
+# Supplier Swap Drill
 
-**Status:** normative companion to the OPCP draft specification
+**Version:** 0.3.0 (draft), a normative companion to [`SPEC.md`](SPEC.md), versioned with it (SPEC.md section 2.1)
+**Format version of swap-drill records:** `opcp_version: "0.3"`
 
 A supplier swap drill proves that a capability can move from an incumbent supplier to a candidate supplier without moving ownership of the business process, context or authority boundary.
 
@@ -73,7 +74,7 @@ The standard result is intentionally independent of a supplier SDK, commercial d
 
 ## 8. Conformance fixtures
 
-A v0.3 conformance suite **MUST** include at least:
+A conformance suite for this version **MUST** include at least:
 
 - a passing swap with unchanged process, context lease and authority policy;
 - a process-change failure;
