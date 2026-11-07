@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release, e.g. v0.2.0 (created on the commit this run starts from if it does not exist)"
+        description: "Tag to release, e.g. v0.2.0 (if it does not exist, it is created on main: start the run from main)"
         required: true
       prerelease:
         description: "Mark as a pre-release (applies when the release is created; an existing release keeps its setting)"
@@ -60,13 +60,15 @@ jobs:
         with:
           ref: ${{ steps.resolve.outputs.sha }}
           path: source
-      - name: Check the tag matches the package version
+      - name: Check tag, versions, changelog and release notes before building
         id: version
         working-directory: source
-        run: python "$TOOL" check-tag "$TAG"
+        run: python "$TOOL" preflight "$TAG"
       - name: Build
         working-directory: source
         run: |
+          # Pin file timestamps to the commit, so rebuilds of one commit on one runner image match.
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           python -m pip install --upgrade pip build
           python -m build
       - name: Use PyPI's files if this version is already published
@@ -76,7 +78,8 @@ jobs:
         working-directory: source
         run: |
           pip install dist/*.whl pytest
-          pytest -q
+          # tests/test_installed_wheel.py fails if the tests import the source tree instead of the wheel.
+          OPCP_EXPECT_INSTALLED=1 pytest -q -p no:cacheprovider
       - name: Build the downloadable form and example report
         working-directory: source
         run: |
@@ -128,7 +131,8 @@ jobs:
             --title "OPCP $TAG" --notes "source/docs/releases/$TAG.md" --assets assets $flags
 
   pypi:
-    needs: build
+    # Last: PyPI cannot be undone, so it runs only after the GitHub release succeeded.
+    needs: [build, github-release]
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true'
     runs-on: ubuntu-latest
     environment:

@@ -7,13 +7,16 @@ that is already public under the same version.
 
 Commands
 --------
-resolve --tag T --fallback SHA
-    The commit to release: the tag's commit if the tag exists, otherwise SHA
-    (the tag is then created at SHA when the release is created). This is what
-    keeps a re-run for an existing tag from building whatever is on main now.
+resolve --tag T --fallback SHA [--event E --ref R]
+    The commit to release: the tag's commit if the tag exists. Otherwise SHA, but
+    only for a manual run started from main (the tag is then created at SHA when
+    the release is created). This keeps a re-run for an existing tag from building
+    whatever is on main now, and stops releases from other branches.
 
-check-tag TAG
-    The tag must look like ``v<semver>`` and match the version in pyproject.toml.
+preflight TAG [--root DIR]
+    Before anything is built: the tag looks like ``v<version>`` and matches
+    pyproject.toml, opcp/__init__.py agrees, the release notes exist and are not
+    empty, and CHANGELOG.md has an entry for the version.
 
 github-release --tag T --target SHA --notes FILE --assets DIR [--prerelease]
     Creates the GitHub release if it does not exist. If it exists, the tag must
@@ -84,11 +87,24 @@ def is_distribution(name: str) -> bool:
     return name.endswith(DISTRIBUTION_SUFFIXES)
 
 
-def project_version(pyproject: Path) -> str:
-    import tomllib
+def _read_version(path: Path, pattern: str) -> str:
+    # A regular expression rather than tomllib, so this also runs on Python 3.10 (CI covers 3.10).
+    match = re.search(pattern, path.read_text(encoding="utf-8"), re.M)
+    if not match:
+        raise ReleaseError(f"no version found in {path}")
+    return match[1]
 
-    with pyproject.open("rb") as handle:
-        return tomllib.load(handle)["project"]["version"]
+
+def project_version(pyproject: Path) -> str:
+    """The [project] version in pyproject.toml."""
+    text = pyproject.read_text(encoding="utf-8")
+    section = re.search(r"^\[project\]\s*$(.*?)(?=^\[|\Z)", text, re.M | re.S)
+    if not section:
+        raise ReleaseError(f"no [project] table in {pyproject}")
+    match = re.search(r'^version\s*=\s*"([^"]+)"', section[1], re.M)
+    if not match:
+        raise ReleaseError(f"no version in the [project] table of {pyproject}")
+    return match[1]
 
 
 def check_tag(tag: str, version: str) -> str:
@@ -98,6 +114,38 @@ def check_tag(tag: str, version: str) -> str:
     if match["version"] != version:
         raise ReleaseError(f"tag {tag} does not match the package version {version} in pyproject.toml")
     return version
+
+
+def preflight(tag: str, root: Path) -> str:
+    """Everything that can be checked before anything is built or published. Returns the version.
+
+    The tag matches pyproject.toml, opcp/__init__.py agrees, the release notes exist and are not
+    empty, and CHANGELOG.md has an entry for the version.
+    """
+    version = check_tag(tag, project_version(root / "pyproject.toml"))
+    module = _read_version(root / "opcp" / "__init__.py", r'^__version__\s*=\s*"([^"]+)"')
+    if module != version:
+        raise ReleaseError(f"opcp/__init__.py says {module}, but pyproject.toml says {version}")
+    notes = root / "docs" / "releases" / f"{tag}.md"
+    if not notes.is_file() or not notes.read_text(encoding="utf-8").strip():
+        raise ReleaseError(f"missing or empty release notes at docs/releases/{tag}.md")
+    if not re.search(rf"^## {re.escape(version)}\b", (root / "CHANGELOG.md").read_text(encoding="utf-8"), re.M):
+        raise ReleaseError(f"CHANGELOG.md has no '## {version}' entry")
+    return version
+
+
+def resolve(gh: "GitHub", tag: str, fallback: str, event: str, ref: str) -> tuple[str, bool]:
+    """The commit to release, and whether the tag already exists.
+
+    An existing tag always decides the commit. A new tag is created only by a manual run started
+    from main, so a release can never be cut from a feature branch or a stray tag push.
+    """
+    tagged = gh.tag_commit(tag)
+    if tagged:
+        return tagged, True
+    if event == "workflow_dispatch" and ref == "refs/heads/main":
+        return fallback, False
+    raise ReleaseError(f"tag {tag} does not exist, and new tags are created only by a manual run on main")
 
 
 # ---------------------------------------------------------------- GitHub
@@ -361,13 +409,15 @@ def _output(key: str, value: str) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("check-tag")
+    p = sub.add_parser("preflight")
     p.add_argument("tag")
-    p.add_argument("--pyproject", default="pyproject.toml", type=Path)
+    p.add_argument("--root", default=".", type=Path)
     p = sub.add_parser("resolve")
     p.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
     p.add_argument("--tag", required=True)
     p.add_argument("--fallback", required=True, help="commit to release when the tag does not exist yet")
+    p.add_argument("--event", default=os.environ.get("GITHUB_EVENT_NAME", ""))
+    p.add_argument("--ref", default=os.environ.get("GITHUB_REF", ""))
     p = sub.add_parser("github-release")
     p.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
     p.add_argument("--tag", required=True)
@@ -383,14 +433,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         p.add_argument("--version", required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command == "check-tag":
-            _output("version", check_tag(args.tag, project_version(args.pyproject)))
+        if args.command == "preflight":
+            _output("version", preflight(args.tag, args.root))
         elif args.command == "resolve":
             if not args.repo:
                 raise ReleaseError("--repo or GITHUB_REPOSITORY is required")
-            tagged = GitHub(args.repo).tag_commit(args.tag)
-            _output("tag_exists", "true" if tagged else "false")
-            _output("sha", tagged or args.fallback)
+            sha, exists = resolve(GitHub(args.repo), args.tag, args.fallback, args.event, args.ref)
+            _output("tag_exists", "true" if exists else "false")
+            _output("sha", sha)
         elif args.command == "adopt-pypi":
             for line in adopt_pypi(args.dist, args.project, args.version):
                 print(line)

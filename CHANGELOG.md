@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Release workflow can be re-run safely.** Re-running a release for an existing tag builds that tag's commit, refreshes the GitHub release instead of failing because it exists, reuses PyPI's files when the version is already published, and stops rather than replace any published wheel or source archive. Runs for the same tag queue. See `docs/RELEASING.md`.
+- **Release workflow can be re-run safely.** Re-running a release for an existing tag builds that tag's commit, refreshes the GitHub release instead of failing because it exists, reuses PyPI's files when the version is already published, and stops rather than replace any published wheel or source archive. PyPI publishes only after the GitHub release succeeds, versions, notes and changelog are checked before building, new tags are cut only from `main`, and runs for the same tag queue. See `docs/RELEASING.md`.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02

@@ -137,9 +137,50 @@ def test_tag_must_match_package_version():
 
 
 def test_check_tag_reads_this_repository():
-    """Guarantee: the check uses the real pyproject.toml version."""
+    """Guarantee: the check uses the real pyproject.toml version (read without tomllib, so it works on 3.10)."""
     version = release.project_version(ROOT / "pyproject.toml")
+    assert version == release._read_version(ROOT / "opcp" / "__init__.py", r'^__version__\s*=\s*"([^"]+)"')
     assert release.check_tag(f"v{version}", version) == version
+
+
+@pytest.fixture
+def repo(tmp_path):
+    (tmp_path / "opcp").mkdir()
+    (tmp_path / "docs" / "releases").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text('[build-system]\nrequires = []\n\n[project]\nname = "opcp"\nversion = "9.9.9"\n\n[tool.x]\nversion = "1"\n')
+    (tmp_path / "opcp" / "__init__.py").write_text('__version__ = "9.9.9"\n')
+    (tmp_path / "docs" / "releases" / "v9.9.9.md").write_text("Notes\n")
+    (tmp_path / "CHANGELOG.md").write_text("# Changelog\n\n## 9.9.9 (draft)\n\n- x\n")
+    return tmp_path
+
+
+def test_preflight_passes_a_complete_release(repo):
+    """Guarantee: a release whose versions, notes and changelog agree passes before anything is built."""
+    assert release.preflight("v9.9.9", repo) == "9.9.9"
+
+
+@pytest.mark.parametrize("breakage, message", [
+    (lambda r: (r / "opcp" / "__init__.py").write_text('__version__ = "9.9.8"\n'), "opcp/__init__.py says 9.9.8"),
+    (lambda r: (r / "docs" / "releases" / "v9.9.9.md").unlink(), "release notes"),
+    (lambda r: (r / "docs" / "releases" / "v9.9.9.md").write_text("  \n"), "release notes"),
+    (lambda r: (r / "CHANGELOG.md").write_text("# Changelog\n"), "CHANGELOG.md has no"),
+    (lambda r: (r / "pyproject.toml").write_text('[project]\nname = "opcp"\nversion = "9.9.10"\n'), "does not match"),
+])
+def test_preflight_stops_before_building(repo, breakage, message):
+    """Guarantee: a release that would ship mismatched versions or no notes stops before any build or upload."""
+    breakage(repo)
+    with pytest.raises(release.ReleaseError, match=message):
+        release.preflight("v9.9.9", repo)
+
+
+def test_new_tags_only_from_a_manual_run_on_main():
+    """Guarantee: an existing tag decides the commit; a new tag is cut only from main, by a person."""
+    gh = release.GitHub(REPO, FakeGitHub(tags={"v1.0.0": ("commit", OTHER)}))
+    assert release.resolve(gh, "v1.0.0", SHA, "workflow_dispatch", "refs/heads/feature") == (OTHER, True)
+    assert release.resolve(gh, "v9.9.9", SHA, "workflow_dispatch", "refs/heads/main") == (SHA, False)
+    for event, ref in (("workflow_dispatch", "refs/heads/feature"), ("push", "refs/tags/v9.9.9")):
+        with pytest.raises(release.ReleaseError, match="only by a manual run on main"):
+            release.resolve(gh, "v9.9.9", SHA, event, ref)
 
 
 # ---------------------------------------------------------------- GitHub release
@@ -330,7 +371,7 @@ def test_cli_writes_github_output(dist, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(release, "fetch_pypi", lambda url: None)
     assert release.main(["pypi-check", "--dist", str(dist), "--version", "9.9.9"]) == 0
     assert out.read_text() == "publish=true\n"
-    assert release.main(["check-tag", "v0.0.1", "--pyproject", str(ROOT / "pyproject.toml")]) == 1
+    assert release.main(["preflight", "v0.0.1", "--root", str(ROOT)]) == 1
     assert "does not match" in capsys.readouterr().err
 
 
@@ -403,3 +444,27 @@ def test_sdist_contents_ignore_timestamps(tmp_path):
     a, b = sdist(tmp_path / "a.tar.gz", 0), sdist(tmp_path / "b.tar.gz", 10**9)
     assert a.read_bytes() != b.read_bytes()
     assert release.archive_contents(a) == release.archive_contents(b)
+
+
+# ---------------------------------------------------------------- the workflow itself
+
+
+def test_workflow_order_and_tooling_source():
+    """Guarantees: PyPI (irreversible) runs only after the GitHub release succeeds; preflight runs before the
+    build; and every job runs the release tooling from the workflow's own commit, so old tags can be re-released."""
+    import yaml
+
+    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))
+    jobs = wf["jobs"]
+    assert "github-release" in jobs["pypi"]["needs"]
+    build = [s.get("name", "") + s.get("run", "") for s in jobs["build"]["steps"]]
+    assert next(i for i, s in enumerate(build) if "preflight" in s) < next(i for i, s in enumerate(build) if "python -m build" in s)
+    assert "release-tools/tools/release/release.py" in wf["env"]["TOOL"]
+    for name, job in jobs.items():
+        runs = " ".join(s.get("run", "") for s in job["steps"])
+        assert "tools/release" not in runs.replace('"$TOOL"', ""), f"{name} runs tooling from the release source"
+        if '"$TOOL"' in runs:
+            tool_checkouts = [s for s in job["steps"] if s.get("uses", "").startswith("actions/checkout")
+                              and s.get("with", {}).get("path") == "release-tools"]
+            assert tool_checkouts and "ref" not in tool_checkouts[0]["with"], name
+    assert wf["concurrency"]["cancel-in-progress"] is False
