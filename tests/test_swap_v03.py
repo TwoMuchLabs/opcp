@@ -124,3 +124,17 @@ def test_proven_time_to_swap_without_date_is_rejected_by_schema_only_when_record
     evidence["time_to_swap"].pop("drill_date", None)
 
     assert validate(evidence)
+
+
+def test_proven_without_drill_date_is_refused_not_dated_today():
+    """SWAP-DRILL 6: a proven figure MUST carry the drill date. The producer must not invent one."""
+    import pytest
+
+    with pytest.raises(ValueError, match="drill_date"):
+        evaluate_swap(
+            capability="verify-identity",
+            incumbent="supplier-a",
+            candidate="supplier-b",
+            cases=[SwapCase("clean", "pass", "pass", "pass")],
+            time_to_swap_confidence="proven",
+        )
