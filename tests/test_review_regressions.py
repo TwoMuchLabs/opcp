@@ -230,3 +230,57 @@ def test_an_empty_event_log_passed_in_is_the_one_used():
     log, gate = EventLog(), AuthorityGate()
     plane = ControlPlane(load_catalogue(data_dir("catalogue")), [], [], gate=gate, log=log, today=TODAY)
     assert plane.log is log and plane.gate is gate
+
+
+def test_concurrent_calls_with_one_key_run_the_effect_once():
+    """Spec 7.1: repeating a request with the same key MUST NOT repeat its effect, including when the repeats overlap."""
+    import threading
+    import time
+
+    class SlowLedger(Ledger):
+        def invoke(self, payload, request):
+            time.sleep(0.05)
+            return super().invoke(payload, request)
+
+    ledger = SlowLedger(ledger_profile())
+    p = ControlPlane(CATALOGUE, [ledger], [journal_route()], gate=AuthorityGate(budgets={"post-journal-entry": 5}), today=TODAY)
+    results, start = [], threading.Barrier(4)
+
+    def worker():
+        start.wait()
+        results.append(p.call("post-journal-entry", JOURNAL, idempotency_key="same", **JCALL))
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert ledger.invocations == 1
+    assert [r.status for r in results] == ["ok"] * 4 and len({r.trace_id for r in results}) == 1
+    assert p.gate.budgets["post-journal-entry"] == 4  # one budget unit, not four
+    assert sum(e["kind"] == "replay" for e in p.log) == 3
+    assert p._key_locks == {}  # no per-key state left behind
+
+
+def test_concurrent_calls_with_different_keys_are_not_serialised():
+    """Serialising by key must not turn the control plane into a single queue."""
+    import threading
+    import time
+
+    inside, peak, guard = [0], [0], threading.Lock()
+
+    class Tracking(Ledger):
+        def invoke(self, payload, request):
+            with guard:
+                inside[0] += 1
+                peak[0] = max(peak[0], inside[0])
+            time.sleep(0.05)
+            with guard:
+                inside[0] -= 1
+            return super().invoke(payload, request)
+
+    p = ControlPlane(CATALOGUE, [Tracking(ledger_profile())], [journal_route()],
+                     gate=AuthorityGate(budgets={"post-journal-entry": 5}), today=TODAY)
+    threads = [threading.Thread(target=p.call, args=("post-journal-entry", JOURNAL),
+                                kwargs=dict(idempotency_key=f"k{i}", **JCALL)) for i in range(3)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert peak[0] > 1

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fix:** concurrent calls with the same capability, principal and idempotency key could all reach the supplier. The control plane now runs them one at a time: the first executes, the rest replay its result (or are refused if their input differs). Calls with different keys still run concurrently. Idempotency is still held in memory only; durability across restarts is a separate, specification-level question.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
