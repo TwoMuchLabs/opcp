@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from ._io import errors as schema_errors
+from ._io import schema_validator
 from .swap import validate_swap_result
 
 
@@ -58,6 +60,9 @@ def evaluate_evidence(evidence: Mapping[str, Any]) -> dict[str, Any]:
     of trusting summary booleans supplied by an upstream control plane.
     """
     errors: list[str] = []
+    # SWAP-DRILL section 1: the record must validate against the schema. Checked here so
+    # that, for example, a "proven" time-to-swap without a drill date is rejected (section 8).
+    errors.extend(f"schema: {problem}" for problem in schema_errors(schema_validator("swap-drill"), evidence))
     missing = sorted(REQUIRED_TOP_LEVEL - set(evidence))
     if missing:
         errors.extend(f"missing top-level field: {field}" for field in missing)
