@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Tamper-evident event log (opt-in).** `EventLog(..., chain=True)` adds `prev_hash` to every entry, and `opcp log verify events.jsonl [--head H]` reports the first changed, inserted, removed or reordered entry. With a head hash kept elsewhere, it also detects entries removed from the end. Off by default while issue #33 discusses making it a specification SHOULD. See `docs/EVENT-LOG.md`.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
