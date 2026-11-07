@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Specification 0.3.0 (proposed, under 14-day review):** new section 2.1 defines three independent versions: the specification version (one for `spec/` and `schema/`), each document type's format version (the specification version in which its schema last changed), and implementation versions. `opcp_version` in section 6.1 now means the contract's format version. SPEC.md and SWAP-DRILL.md both carry 0.3.0. No document changes shape and every existing document stays valid. `opcp.SPEC_VERSION` is now `"0.3.0"`.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02

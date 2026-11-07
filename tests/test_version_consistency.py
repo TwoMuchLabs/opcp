@@ -117,7 +117,40 @@ def test_swap_drill_example_and_evaluator_use_schema_format_version():
         assert literals == {version}, f"{module} uses {literals}, schema requires {version}"
 
 
-def test_swap_drill_spec_title_names_format_version():
+def test_swap_drill_spec_states_its_format_version():
     # Guarantee: the normative swap-drill text and its schema describe the same format version.
-    title = (ROOT / "spec" / "SWAP-DRILL.md").read_text(encoding="utf-8").splitlines()[0]
-    assert title.endswith(f"OPCP v{_format_version('swap-drill')}"), title
+    text = (ROOT / "spec" / "SWAP-DRILL.md").read_text(encoding="utf-8")
+    assert f'opcp_version: "{_format_version("swap-drill")}"' in text
+
+
+def _spec_version(name: str) -> str:
+    m = re.search(r"^\*\*Version:\*\* (\d+\.\d+\.\d+)", (ROOT / "spec" / name).read_text(encoding="utf-8"), re.M)
+    assert m, f"spec/{name} has no '**Version:** X.Y.Z' line"
+    return m.group(1)
+
+
+def test_companion_specifications_share_the_core_version():
+    # Guarantee (SPEC 2.1): the normative set has one specification version.
+    core = _spec_version("SPEC.md")
+    for path in sorted((ROOT / "spec").glob("*.md")):
+        assert _spec_version(path.name) == core, path.name
+
+
+def test_package_states_the_specification_version_it_implements():
+    # Guarantee (SPEC 2.1): an implementation states which specification version it implements.
+    assert opcp.SPEC_VERSION == _spec_version("SPEC.md")
+
+
+def test_spec_format_version_table_matches_the_schemas():
+    # Guarantee (SPEC 2.1): the format versions the specification defines are the ones its schemas require.
+    text = (ROOT / "spec" / "SPEC.md").read_text(encoding="utf-8")
+    section = text.split("### 2.1 Versions", 1)[1].split("\n## ", 1)[0]
+    rows = dict(re.findall(r"^\| ([^|]+?) \| `[a-z_]+` \| `\"([\d.]+)\"` \|$", section, re.M))
+    expected = {
+        "Capability contract": "capability", "Route": "route", "Request and response envelope": "envelope",
+        "Swap-drill record ([`SWAP-DRILL.md`](SWAP-DRILL.md))": "swap-drill",
+        "Scorecard assessment": "scorecard", "Scorecard answers": "answers",
+    }
+    assert set(rows) == set(expected), rows
+    for label, schema in expected.items():
+        assert rows[label] == _format_version(schema), label

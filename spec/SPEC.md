@@ -1,6 +1,6 @@
 # Open Process Control Plane (OPCP) Specification
 
-**Version:** 0.2.0 (draft)
+**Version:** 0.3.0 (draft)
 **Status:** Request for comments
 **Authors:** Deepak Waghmare, Shaad Sufi
 **Licence:** Apache License 2.0
@@ -26,6 +26,29 @@ The specification also defines an **Exit-Readiness Scorecard**, so a firm can me
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT** and **MAY** are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
 Sections marked *(informative)* explain or advise and are not requirements.
+
+### 2.1 Versions
+
+OPCP has three version numbers, which change independently.
+
+1. **Specification version.** One version for the normative set: this document, its companion specifications in `spec/` (such as [`SWAP-DRILL.md`](SWAP-DRILL.md)) and the schemas in `schema/`. It is shown in the header of each specification document and changes only through the request-for-comments process in `GOVERNANCE.md`. A minor version adds compatible features. A breaking change requires a new major version. While the major version is 0, a minor version **MAY** include breaking changes, and its release notes **MUST** list them.
+2. **Format version.** Every document type carries a format version: `opcp_version` in capability contracts, routes and swap-drill records; `envelope_version` in requests and responses; `scorecard_version` and `answers_version` in scorecard files. A format version is **the specification version in which that document type's schema last changed**. A document type whose schema is unchanged keeps its format version when the specification version moves on. Each schema's `$id` carries its format version.
+3. **Implementation version.** Each implementation versions its own releases. An implementation **MUST** state which specification version it implements, and **SHOULD** list the format versions it reads and writes.
+
+An implementation **MUST** reject a document whose format version it does not support, and **MUST NOT** infer a document's meaning from an implementation version.
+
+Format versions defined by specification 0.3.0:
+
+| Document type | Field | Format version |
+|---|---|---|
+| Capability contract | `opcp_version` | `"0.1"` |
+| Route | `opcp_version` | `"0.1"` |
+| Request and response envelope | `envelope_version` | `"0.1"` |
+| Swap-drill record ([`SWAP-DRILL.md`](SWAP-DRILL.md)) | `opcp_version` | `"0.3"` |
+| Scorecard assessment | `scorecard_version` | `"0.1"` |
+| Scorecard answers | `answers_version` | `"0.1"` |
+
+*(informative)* The reference implementation's package version is independent: package 0.3.0 implements specification 0.3.0, but a later package release that only fixes code keeps implementing 0.3.0.
 
 ## 3. Terminology
 
@@ -81,7 +104,7 @@ A capability contract is a YAML or JSON document that **MUST** validate against 
 
 | Field | Required | Meaning |
 |---|---|---|
-| `opcp_version` | yes | Specification version the contract targets, e.g. `"0.1"`. |
+| `opcp_version` | yes | Format version of the capability contract (section 2.1), `"0.1"` in this specification. |
 | `id` | yes | Stable identifier in kebab case, e.g. `verify-identity`. |
 | `version` | yes | Semantic version of the contract. |
 | `name` | yes | Human-readable name. |
@@ -116,7 +139,7 @@ Every capability call uses one request envelope and one response envelope, defin
 
 | Field | Required | Meaning |
 |---|---|---|
-| `envelope_version` | yes | `"0.1"`. |
+| `envelope_version` | yes | Format version of the envelope (section 2.1), `"0.1"` in this specification. |
 | `trace_id` | yes | Unique identifier for this call, carried into every log entry. |
 | `idempotency_key` | yes | Scoped to the capability and principal. Repeating a request with the same key and input **MUST NOT** repeat its effect; reusing a key with different input **MUST** be refused. A runtime **MUST NOT** replay a rejected or failed response, so that a retry after approval or recovery can succeed. |
 | `capability` | yes | `{id, version}` of the contract. |
@@ -132,7 +155,7 @@ Every capability call uses one request envelope and one response envelope, defin
 
 | Field | Required | Meaning |
 |---|---|---|
-| `envelope_version` | yes | `"0.1"`. |
+| `envelope_version` | yes | Format version of the envelope (section 2.1), `"0.1"` in this specification. |
 | `trace_id` | yes | Same as the request. |
 | `status` | yes | `ok`, `failed`, `rejected` (stopped by the gate) or `escalated` (handed to a human). |
 | `output` | when `ok` | Output that validates against the contract and its archetype (Section 5). |

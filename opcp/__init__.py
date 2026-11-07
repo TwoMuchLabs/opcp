@@ -4,4 +4,4 @@ Own your processes, your context and your authority; rent capabilities from any 
 """
 
 __version__ = "0.3.0"
-SPEC_VERSION = "0.1"
+SPEC_VERSION = "0.3.0"  # specification version this package implements (spec section 2.1)
