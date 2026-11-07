@@ -6,7 +6,7 @@ Superapps and vendor AI agents are absorbing how businesses run: their rules, th
 
 OPCP is an open framework for the opposite arrangement. The business keeps its process logic, its context and its authority in open formats it controls. Vendors, internal systems and human teams plug in underneath through standard capability contracts, so any of them can be swapped.
 
-> **Status:** draft 0.3 for comment. The specification, schemas and tools will change based on feedback.
+> **Status:** draft for comment. Package release 0.3.0; core specification draft 0.2.0. The specification, schemas and tools will change based on feedback. [How OPCP is versioned](docs/VERSIONING.md).
 
 ## What is in this repository
 
@@ -21,11 +21,13 @@ OPCP is an open framework for the opposite arrangement. The business keeps its p
 
 ## Try the scorecard in two minutes
 
-**Before you start.** You need Python 3.10 or later. Check with `python3 --version` (or `python --version` on Windows). The package is not yet on PyPI, so install it from this folder:
+**Before you start.** You need Python 3.10 or later. Check with `python3 --version` (or `python --version` on Windows). Install the package from PyPI:
 
 ```bash
-pip install .                           # run inside the downloaded OPCP folder
+pip install opcp
 ```
+
+To use the latest unreleased version instead, run `pip install .` inside a copy of this repository.
 
 Then:
 

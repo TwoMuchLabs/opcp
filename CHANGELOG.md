@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Versioning documented.** `docs/VERSIONING.md` lists every version marker (package, specification, document formats, schemas, question bank) and where they disagree; `docs/adr/0001-versioning-model.md` proposes a model for public review. `tests/test_version_consistency.py` guards the relationships that already hold and records the known inconsistencies as expected failures. No version numbers were changed.
+- README: install from PyPI (`pip install opcp`); the status line now gives the package and specification versions separately.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
