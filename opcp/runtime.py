@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import threading
 import time
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -54,6 +55,9 @@ class ControlPlane:
         self.store_values = store_values
         self.require_accountable_role = require_accountable_role
         self._responses: dict[tuple[str, str, str], tuple[str, Response]] = {}
+        # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
+        self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
+        self._key_locks_guard = threading.Lock()
         self._check_configuration(concentration_limit)
 
     # ------------------------------------------------------------ setup
@@ -90,6 +94,41 @@ class ControlPlane:
     # ------------------------------------------------------------ call
 
     def call(
+        self,
+        capability_id: str,
+        payload: Mapping[str, Any],
+        *,
+        process_id: str,
+        step: str,
+        principal: str,
+        data_classification: str,
+        idempotency_key: str,
+        residency: Sequence[str] | None = None,
+        segment: str | None = None,
+        accountable_role: str | None = None,
+    ) -> Response:
+        """Make one capability call through the gate, lease, router and event log.
+
+        Calls that share a capability, principal and idempotency key are serialised: a second call with
+        the same key waits for the first, then replays its result (or is refused if its input differs).
+        Calls with different keys run concurrently.
+        """
+        key = (capability_id, principal, idempotency_key)
+        with self._key_locks_guard:
+            entry = self._key_locks.setdefault(key, [threading.Lock(), 0])
+            entry[1] += 1
+        try:
+            with entry[0]:
+                return self._call(capability_id, payload, process_id=process_id, step=step, principal=principal,
+                                  data_classification=data_classification, idempotency_key=idempotency_key,
+                                  residency=residency, segment=segment, accountable_role=accountable_role)
+        finally:
+            with self._key_locks_guard:
+                entry[1] -= 1
+                if entry[1] == 0:
+                    del self._key_locks[key]
+
+    def _call(
         self,
         capability_id: str,
         payload: Mapping[str, Any],

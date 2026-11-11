@@ -4,6 +4,7 @@
 
 - **Release workflow can be re-run safely.** Re-running a release for an existing tag builds that tag's commit, refreshes the GitHub release instead of failing because it exists, reuses PyPI's files when the version is already published, and stops rather than replace any published wheel or source archive. PyPI publishes only after the GitHub release succeeds, versions, notes and changelog are checked before building, new tags are cut only from `main`, and runs for the same tag queue. See `docs/RELEASING.md`.
 - **Fix:** a gate override that would lower a capability's Reversibility Class is now rejected when the control plane is built, and if the authority gate raises an error during a call, the call is refused as R4 and the refusal is written to the event log. Before, the error escaped `ControlPlane.call()` with no gate entry logged (spec 10.2, 10.6).
+- **Fix:** concurrent calls with the same capability, principal and idempotency key could all reach the supplier. The control plane now runs them one at a time: the first executes, the rest replay its result (or are refused if their input differs). Calls with different keys still run concurrently. Idempotency is still held in memory only; durability across restarts is a separate, specification-level question.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
