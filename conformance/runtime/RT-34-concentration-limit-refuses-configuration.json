@@ -1,0 +1,82 @@
+{
+  "id": "RT-34-concentration-limit-refuses-configuration",
+  "guarantee": "A configuration in which one supplier is primary for more critical routes than the concentration limit allows is refused (spec 9.4).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity",
+      "extract-document-fields"
+    ],
+    "concentration_limit": 0.5,
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      },
+      {
+        "adapter_id": "ax",
+        "supplier_id": "A",
+        "capability": "extract-document-fields",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a"
+        ],
+        "critical": true
+      },
+      {
+        "opcp_version": "0.1",
+        "capability": "extract-document-fields",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "ax"
+        ],
+        "critical": true
+      }
+    ]
+  },
+  "calls": [],
+  "expect_setup_rejected": true
+}
