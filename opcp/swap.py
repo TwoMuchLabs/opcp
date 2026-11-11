@@ -171,7 +171,9 @@ def evaluate_swap(
     if time_to_swap_confidence not in {"estimated", "proven"}:
         raise ValueError("time_to_swap_confidence must be 'estimated' or 'proven'")
     if time_to_swap_confidence == "proven" and not drill_date:
-        drill_date = date.today().isoformat()
+        # A proven figure must be backed by a completed drill on a stated date (SWAP-DRILL 6).
+        # Supplying today's date here would turn an unproven claim into a "proven" one.
+        raise ValueError("a proven time-to-swap needs the date of the completed drill (drill_date)")
     if drill_date:
         date.fromisoformat(drill_date)
     if execution_mode not in {"shadow", "rehearsal", "production"}:
