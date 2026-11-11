@@ -1,0 +1,125 @@
+{
+  "id": "RT-25-rejection-not-replayed",
+  "guarantee": "A rejected response is not replayed, so a retry with the same key after approval succeeds (spec 7.1).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "post-journal-entry"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "l",
+        "supplier_id": "L",
+        "capability": "post-journal-entry",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "receipt_id": "rcpt-1",
+              "status": "completed",
+              "compensation": "post a reversing entry"
+            },
+            "evidence": [
+              {
+                "type": "ledger",
+                "reference": "gl-1"
+              }
+            ]
+          }
+        },
+        "max_rclass": "R2",
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "post-journal-entry",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "l"
+        ]
+      }
+    ],
+    "gate": {
+      "approvals": [
+        {
+          "approved": false,
+          "reason": "not yet"
+        },
+        {
+          "approved": true,
+          "by": "controller"
+        }
+      ]
+    }
+  },
+  "calls": [
+    {
+      "capability": "post-journal-entry",
+      "input": {
+        "entry_date": "2026-10-31",
+        "currency": "SGD",
+        "lines": [
+          {
+            "account": "6100",
+            "debit": 10,
+            "credit": 0
+          },
+          {
+            "account": "2100",
+            "debit": 0,
+            "credit": 10
+          }
+        ]
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "rejected",
+        "supplier": null,
+        "gate_decision": {
+          "allowed": false,
+          "rclass": "R2"
+        }
+      }
+    },
+    {
+      "capability": "post-journal-entry",
+      "input": {
+        "entry_date": "2026-10-31",
+        "currency": "SGD",
+        "lines": [
+          {
+            "account": "6100",
+            "debit": 10,
+            "credit": 0
+          },
+          {
+            "account": "2100",
+            "debit": 0,
+            "credit": 10
+          }
+        ]
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "ok",
+        "supplier": "L",
+        "rclass": "R2",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R2"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "l": 1
+    }
+  }
+}

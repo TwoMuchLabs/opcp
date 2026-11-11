@@ -1,0 +1,156 @@
+{
+  "id": "RT-16-lease-fails-closed-for-undeterminable-fields",
+  "guarantee": "A field whose schema uses composition (anyOf) is withheld whole, and an object without additionalProperties: true passes only its declared parts; an object with additionalProperties: true passes whole (spec 11.2).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      {
+        "opcp_version": "0.1",
+        "id": "screen-party",
+        "version": "1.0.0",
+        "name": "Screen party",
+        "archetype": "check",
+        "description": "Screens a party.",
+        "rclass": "R0",
+        "data_classification": "confidential",
+        "input": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "identifier": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "scheme": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "notes": {
+              "type": "object"
+            },
+            "tags": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": [
+            "verdict",
+            "reason_codes"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "pass",
+                "fail",
+                "refer"
+              ]
+            },
+            "reason_codes": {
+              "type": "array"
+            }
+          }
+        },
+        "examples": [
+          {
+            "name": "x",
+            "input": {
+              "name": "Alex"
+            }
+          }
+        ]
+      }
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "s",
+        "supplier_id": "S",
+        "capability": "screen-party",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "screen-party",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "s"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "screen-party",
+      "data_classification": "confidential",
+      "idempotency_key": "k1",
+      "input": {
+        "name": "Alex",
+        "identifier": {
+          "scheme": "nric",
+          "value": "S123"
+        },
+        "notes": {
+          "free": "text"
+        },
+        "tags": {
+          "any": "thing"
+        }
+      },
+      "expect": {
+        "status": "ok",
+        "supplier": "S",
+        "rclass": "R0",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "received": {
+      "s": [
+        {
+          "name": "Alex",
+          "notes": {},
+          "tags": {
+            "any": "thing"
+          }
+        }
+      ]
+    }
+  }
+}
