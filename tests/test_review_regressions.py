@@ -230,3 +230,24 @@ def test_an_empty_event_log_passed_in_is_the_one_used():
     log, gate = EventLog(), AuthorityGate()
     plane = ControlPlane(load_catalogue(data_dir("catalogue")), [], [], gate=gate, log=log, today=TODAY)
     assert plane.log is log and plane.gate is gate
+
+
+def test_lowering_override_is_a_configuration_error():
+    """Spec 10.1: a deployment may raise a class, never lower it. Caught when the control plane is built."""
+    gate = AuthorityGate(overrides={"post-journal-entry": RClass.R0})
+    with pytest.raises(Exception, match="may only raise"):
+        ControlPlane(CATALOGUE, [Ledger(ledger_profile())], [journal_route()], gate=gate, today=TODAY)
+
+
+def test_gate_error_fails_closed_and_is_logged():
+    """Spec 10.2 and 10.6: if the gate cannot decide, nothing is invoked, the call is refused and the refusal is logged."""
+    ledger = Ledger(ledger_profile())
+    p = ControlPlane(CATALOGUE, [ledger], [journal_route()], gate=AuthorityGate(budgets={"post-journal-entry": 1}), today=TODAY)
+    p.gate.overrides = {"post-journal-entry": RClass.R0}  # changed after construction
+    r = p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
+    assert r.status == "rejected" and ledger.invocations == 0
+    gate_entries = [e for e in p.log if e["kind"] == "gate"]
+    assert len(gate_entries) == 1 and gate_entries[0]["allowed"] is False and gate_entries[0]["rclass"] == "R4"
+    assert "ValueError" in gate_entries[0]["reason"] and "lower" not in gate_entries[0]["reason"]  # no detail unless values are stored
+    p.gate.overrides = {}
+    assert p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL).ok  # a refusal is not cached

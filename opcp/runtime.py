@@ -74,6 +74,11 @@ class ControlPlane:
                     problems.append(f"route for {cap!r} names unknown adapter {adapter_id!r}")
                 elif adapter.profile.capability != cap:
                     problems.append(f"adapter {adapter_id!r} fulfils {adapter.profile.capability!r}, not {cap!r}")
+        for cap, raised in sorted(getattr(self.gate, "overrides", {}).items()):
+            contract = self.contracts.get(cap)
+            if contract is not None and raised < contract.rclass:
+                problems.append(f"gate override would lower {cap!r} from {contract.rclass} to {raised}; "
+                                "overrides may only raise (spec 10.1)")
         if problems:
             raise ConfigurationError("; ".join(problems))
         if limit is not None:
@@ -168,7 +173,14 @@ class ControlPlane:
             return stop("failed", str(contract.rclass), "invalid request", "; ".join(problems))
 
         # Authority gate before any supplier (spec 10)
-        verdict = self.gate.decide(contract, request, accountable_role)
+        try:
+            verdict = self.gate.decide(contract, request, accountable_role)
+        except Exception as exc:  # a gate that cannot decide refuses, and the refusal is logged (spec 10.2, 10.6)
+            detail = str(exc) if self.store_values else type(exc).__name__
+            self.log.append("gate", trace, allowed=False, rclass="R4", decision="never_autonomous",
+                            reason=f"gate error ({detail}); fail closed", approved_by=[], notify=False,
+                            accountable_role=accountable_role)
+            return stop("rejected", "R4", "authority gate", f"gate error ({detail}); fail closed")
         self.log.append("gate", trace, **verdict.to_dict())
         if not verdict.allowed:
             return stop("rejected", str(verdict.rclass), "authority gate", verdict.reason)
