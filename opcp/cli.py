@@ -154,6 +154,20 @@ def _ocel(args: argparse.Namespace) -> int:
     return 0
 
 
+def _log_verify(args: argparse.Namespace) -> int:
+    from .eventlog import verify_file
+
+    result = verify_file(args.path, args.head)
+    if result.ok:
+        print(f"Chain intact: {result.entries} entries. Head {result.head}")
+        if args.head is None:
+            print("Without --head, entries removed from the end cannot be detected. Keep the head somewhere else.")
+        return 0
+    where = f" at line {result.line}" if result.line else ""
+    print(f"Chain broken{where}: {result.problem}. {result.entries} entries verified before it.", file=sys.stderr)
+    return 1
+
+
 def _swap_demo(args: argparse.Namespace) -> int:
     import json
 
@@ -175,6 +189,14 @@ def _swap_demo(args: argparse.Namespace) -> int:
     evidence = result.evidence()
     print(json.dumps(evidence, indent=2))
     return 0 if result.passed else 1
+
+
+def _swap_drill(args: argparse.Namespace) -> int:
+    from .swap_drill import run_swap_drill
+
+    result = run_swap_drill(args.path)
+    print(__import__("json").dumps(result, indent=2, sort_keys=True))
+    return 0 if result["promotion_ready"] else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -224,12 +246,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="Overwrite an existing file")
     p.set_defaults(func=_ocel)
 
+    p = sub.add_parser("log", help="Work with an exported event log")
+    lg = p.add_subparsers(dest="action", required=True)
+    p = lg.add_parser("verify", help="Check a hash-chained event log for changed, inserted, removed or reordered entries")
+    p.add_argument("path")
+    p.add_argument("--head", help="The head hash recorded elsewhere, to also detect entries removed from the end")
+    p.set_defaults(func=_log_verify)
+
     p = sub.add_parser("demo", help="Run the reference runtime with simulated suppliers")
     p.set_defaults(func=_demo)
     p = sub.add_parser("conformance-demo", help="Run adapter and runtime conformance checks")
     p.set_defaults(func=_conformance_demo)
     p = sub.add_parser("swap-demo", help="Run the first AI supplier swap-drill demonstration")
     p.set_defaults(func=_swap_demo)
+    p = sub.add_parser("swap-drill", help="Evaluate an OPCP v0.3 swap-drill evidence record")
+    p.add_argument("path")
+    p.set_defaults(func=_swap_drill)
     return parser
 
 

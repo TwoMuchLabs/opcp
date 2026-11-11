@@ -6,4 +6,6 @@ Deepak Waghmare, Shaad Sufi and contributors.
 
 OPCP's authority gate uses the Reversibility Classes (R0-R4) defined in
 "Reversibility Classes for Agent Actions" by Deepak Waghmare and contributors,
-https://github.com/TwoMuchLabs/reversibility-classes, licensed under CC BY 4.0.
+https://github.com/TwoMuchLabs/reversibility-classes. Its specification is
+licensed under the Apache License 2.0 from v0.3.1 (earlier versions under
+CC BY 4.0).
