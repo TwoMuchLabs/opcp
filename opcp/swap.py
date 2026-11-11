@@ -162,6 +162,9 @@ def evaluate_swap(
 
     The candidate is promotable only when every normative gate passes. Business
     regression is intentionally separate from structural contract conformance.
+    Revision equality is authoritative for the three ownership invariants; a
+    caller cannot accidentally assert portability while supplying different
+    process, context-lease or authority-policy revisions.
     """
     if measured_seconds < 0 or contracting_days < 0 or onboarding_days < 0:
         raise ValueError("swap timing values cannot be negative")
@@ -173,6 +176,16 @@ def evaluate_swap(
         date.fromisoformat(drill_date)
     if execution_mode not in {"shadow", "rehearsal", "production"}:
         raise ValueError("execution_mode must be shadow, rehearsal, or production")
+
+    process_unchanged = process_unchanged and (
+        process_incumbent_revision == process_candidate_revision
+    )
+    context_lease_unchanged = context_lease_unchanged and (
+        context_lease_incumbent_revision == context_lease_candidate_revision
+    )
+    authority_policy_unchanged = authority_policy_unchanged and (
+        authority_policy_incumbent_revision == authority_policy_candidate_revision
+    )
 
     regression_pass = all(case.passed for case in cases)
     material_exception_regression = all(
