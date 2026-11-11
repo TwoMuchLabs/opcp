@@ -6,7 +6,7 @@ A supplier swap drill proves that a capability can move from an incumbent suppli
 
 ## 1. Scope
 
-A swap drill evaluates one capability contract, one incumbent supplier and one candidate supplier against the same business-owned process and regression cases. It is an OPCP interoperability primitive, not a Soven-specific workflow.
+A swap drill evaluates one capability contract, one incumbent supplier and one candidate supplier against the same business-owned process and regression cases. It is an OPCP interoperability primitive that any conformant control plane can run.
 
 A conforming implementation **MUST** produce a machine-readable result that validates against [`../schema/swap-drill.schema.json`](../schema/swap-drill.schema.json).
 
