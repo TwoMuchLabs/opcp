@@ -1,0 +1,132 @@
+{
+  "id": "RT-37-archetype-fields-required",
+  "guarantee": "Output missing a field the archetype requires (check: reason_codes) is not accepted even when the contract's own output schema does not require it (spec 5 rule 1).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      {
+        "opcp_version": "0.1",
+        "id": "screen-loose",
+        "version": "1.0.0",
+        "name": "Loosely specified check",
+        "archetype": "check",
+        "description": "A check whose own output schema omits a field the archetype requires.",
+        "rclass": "R0",
+        "data_classification": "internal",
+        "input": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": [
+            "verdict"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "pass",
+                "fail",
+                "refer"
+              ]
+            }
+          }
+        },
+        "examples": [
+          {
+            "name": "x",
+            "input": {
+              "name": "Alex"
+            }
+          }
+        ]
+      }
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "screen-loose",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass"
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.99
+          }
+        },
+        "max_data_classification": "internal"
+      },
+      {
+        "adapter_id": "b",
+        "supplier_id": "B",
+        "capability": "screen-loose",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        },
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "screen-loose",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a",
+          "b"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "screen-loose",
+      "input": {
+        "name": "Alex"
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "ok",
+        "supplier": "B",
+        "rclass": "R0",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 1,
+      "b": 1
+    }
+  }
+}

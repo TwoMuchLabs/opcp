@@ -21,11 +21,13 @@ OPCP is an open framework for the opposite arrangement. The business keeps its p
 
 ## Try the scorecard in two minutes
 
-**Before you start.** You need Python 3.10 or later. Check with `python3 --version` (or `python --version` on Windows). The package is not yet on PyPI, so install it from this folder:
+**Before you start.** You need Python 3.10 or later. Check with `python3 --version` (or `python --version` on Windows). Install the package from PyPI:
 
 ```bash
-pip install .                           # run inside the downloaded OPCP folder
+pip install opcp
 ```
+
+To use the latest unreleased version instead, run `pip install .` inside a copy of this repository.
 
 Then:
 

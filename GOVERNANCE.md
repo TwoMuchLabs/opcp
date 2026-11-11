@@ -45,7 +45,7 @@ The project follows the [Contributor Covenant, version 2.1](https://www.contribu
 
 - [x] Security contact: hello@twomuchlabs.com (see [SECURITY.md](SECURITY.md))
 - [ ] Decision on a specification-specific licence (see section 1.1)
-- [ ] Publication of the package on PyPI
+- [x] Publication of the package on PyPI: [`opcp`](https://pypi.org/project/opcp/), from version 0.3.0
 - [x] Project name: Open Process Control Plane (OPCP). Use the full name first; "OPCP" is also used by an unrelated OVHcloud product.
 - [ ] Formal trademark search for the name
 - [x] Public repository: https://github.com/TwoMuchLabs/opcp

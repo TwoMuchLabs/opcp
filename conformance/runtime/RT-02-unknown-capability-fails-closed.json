@@ -1,0 +1,69 @@
+{
+  "id": "RT-02-unknown-capability-fails-closed",
+  "guarantee": "A call to a capability with no contract is treated as R4 and refused, and the decision is recorded (spec 10.2, 10.6).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "wire-funds",
+      "input": {
+        "amount": 1
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "rejected",
+        "supplier": null,
+        "rclass": "R4",
+        "gate_decision": {
+          "allowed": false,
+          "rclass": "R4"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 0
+    }
+  }
+}

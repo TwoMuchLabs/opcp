@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import threading
 import time
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -54,6 +55,9 @@ class ControlPlane:
         self.store_values = store_values
         self.require_accountable_role = require_accountable_role
         self._responses: dict[tuple[str, str, str], tuple[str, Response]] = {}
+        # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
+        self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
+        self._key_locks_guard = threading.Lock()
         self._check_configuration(concentration_limit)
 
     # ------------------------------------------------------------ setup
@@ -74,6 +78,11 @@ class ControlPlane:
                     problems.append(f"route for {cap!r} names unknown adapter {adapter_id!r}")
                 elif adapter.profile.capability != cap:
                     problems.append(f"adapter {adapter_id!r} fulfils {adapter.profile.capability!r}, not {cap!r}")
+        for cap, raised in sorted(getattr(self.gate, "overrides", {}).items()):
+            contract = self.contracts.get(cap)
+            if contract is not None and raised < contract.rclass:
+                problems.append(f"gate override would lower {cap!r} from {contract.rclass} to {raised}; "
+                                "overrides may only raise (spec 10.1)")
         if problems:
             raise ConfigurationError("; ".join(problems))
         if limit is not None:
@@ -85,6 +94,41 @@ class ControlPlane:
     # ------------------------------------------------------------ call
 
     def call(
+        self,
+        capability_id: str,
+        payload: Mapping[str, Any],
+        *,
+        process_id: str,
+        step: str,
+        principal: str,
+        data_classification: str,
+        idempotency_key: str,
+        residency: Sequence[str] | None = None,
+        segment: str | None = None,
+        accountable_role: str | None = None,
+    ) -> Response:
+        """Make one capability call through the gate, lease, router and event log.
+
+        Calls that share a capability, principal and idempotency key are serialised: a second call with
+        the same key waits for the first, then replays its result (or is refused if its input differs).
+        Calls with different keys run concurrently.
+        """
+        key = (capability_id, principal, idempotency_key)
+        with self._key_locks_guard:
+            entry = self._key_locks.setdefault(key, [threading.Lock(), 0])
+            entry[1] += 1
+        try:
+            with entry[0]:
+                return self._call(capability_id, payload, process_id=process_id, step=step, principal=principal,
+                                  data_classification=data_classification, idempotency_key=idempotency_key,
+                                  residency=residency, segment=segment, accountable_role=accountable_role)
+        finally:
+            with self._key_locks_guard:
+                entry[1] -= 1
+                if entry[1] == 0:
+                    del self._key_locks[key]
+
+    def _call(
         self,
         capability_id: str,
         payload: Mapping[str, Any],
@@ -168,7 +212,14 @@ class ControlPlane:
             return stop("failed", str(contract.rclass), "invalid request", "; ".join(problems))
 
         # Authority gate before any supplier (spec 10)
-        verdict = self.gate.decide(contract, request, accountable_role)
+        try:
+            verdict = self.gate.decide(contract, request, accountable_role)
+        except Exception as exc:  # a gate that cannot decide refuses, and the refusal is logged (spec 10.2, 10.6)
+            detail = str(exc) if self.store_values else type(exc).__name__
+            self.log.append("gate", trace, allowed=False, rclass="R4", decision="never_autonomous",
+                            reason=f"gate error ({detail}); fail closed", approved_by=[], notify=False,
+                            accountable_role=accountable_role)
+            return stop("rejected", "R4", "authority gate", f"gate error ({detail}); fail closed")
         self.log.append("gate", trace, **verdict.to_dict())
         if not verdict.allowed:
             return stop("rejected", str(verdict.rclass), "authority gate", verdict.reason)
