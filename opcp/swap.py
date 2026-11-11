@@ -226,9 +226,62 @@ def validate_swap_result(result: Mapping[str, Any]) -> list[str]:
     expected = "passed" if all(gates.get(name) is True for name in gate_names) else "failed"
     if result.get("decision") != expected:
         errors.append(f"decision must be {expected!r} for the supplied promotion gates")
+    errors.extend(_invariant_errors(result, gates))
+    errors.extend(_regression_count_errors(result.get("regression")))
     execution = result.get("execution", {})
     if execution.get("mode") == "shadow" and execution.get("customer_visible"):
         errors.append("shadow drills cannot be customer-visible")
     if execution.get("mode") == "shadow" and execution.get("authority_effects_applied"):
         errors.append("shadow drills cannot apply authority effects")
+    return errors
+
+
+_OWNERSHIP_BOUNDARIES = ("process", "context_lease", "authority_policy")
+
+
+def _invariant_errors(result: Mapping[str, Any], gates: Mapping[str, Any]) -> list[str]:
+    """SWAP-DRILL section 3: an ownership gate may be true only if the two revisions are equal.
+
+    Checked from the revisions themselves, so a record cannot claim an unchanged
+    boundary while naming different revisions, and the invariant and the gate
+    cannot disagree.
+    """
+    errors: list[str] = []
+    invariants = result.get("invariants")
+    if not isinstance(invariants, Mapping):
+        return ["invariants must be an object"]
+    if not isinstance(gates, Mapping):
+        return errors
+    for boundary in _OWNERSHIP_BOUNDARIES:
+        gate_name = f"{boundary}_unchanged"
+        entry = invariants.get(boundary)
+        if not isinstance(entry, Mapping):
+            errors.append(f"invariants.{boundary} is missing")
+            continue
+        incumbent = entry.get("incumbent_revision")
+        candidate = entry.get("candidate_revision")
+        if not isinstance(incumbent, str) or not incumbent or not isinstance(candidate, str) or not candidate:
+            errors.append(f"invariants.{boundary} must name both revisions")
+            continue
+        if entry.get("unchanged") is not gates.get(gate_name):
+            errors.append(f"invariants.{boundary}.unchanged does not match promotion_gates.{gate_name}")
+        if incumbent != candidate and (entry.get("unchanged") is True or gates.get(gate_name) is True):
+            errors.append(f"{boundary} revisions differ ({incumbent!r} != {candidate!r}) "
+                          f"but {gate_name} is true")
+    return errors
+
+
+def _regression_count_errors(regression: Any) -> list[str]:
+    """SWAP-DRILL section 5: the reported counts must describe the included cases."""
+    if not isinstance(regression, Mapping) or not isinstance(regression.get("cases"), list):
+        return []
+    cases = regression["cases"]
+    passed = sum(isinstance(c, Mapping) and c.get("candidate") == c.get("expected") for c in cases)
+    expected = {"total_cases": len(cases), "passed_cases": passed, "failed_cases": len(cases) - passed}
+    errors = [f"regression.{name} is {regression.get(name)!r}; the cases give {value}"
+              for name, value in expected.items() if name in regression and regression.get(name) != value]
+    for case in cases:
+        if isinstance(case, Mapping) and "passed" in case \
+                and case["passed"] is not (case.get("candidate") == case.get("expected")):
+            errors.append(f"regression case {case.get('case_id')!r}: passed does not match expected and candidate")
     return errors

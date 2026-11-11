@@ -232,24 +232,41 @@ def test_an_empty_event_log_passed_in_is_the_one_used():
     assert plane.log is log and plane.gate is gate
 
 
+def test_lowering_override_is_a_configuration_error():
+    """Spec 10.1: a deployment may raise a class, never lower it. Caught when the control plane is built."""
+    gate = AuthorityGate(overrides={"post-journal-entry": RClass.R0})
+    with pytest.raises(Exception, match="may only raise"):
+        ControlPlane(CATALOGUE, [Ledger(ledger_profile())], [journal_route()], gate=gate, today=TODAY)
+
+
+def test_gate_error_fails_closed_and_is_logged():
+    """Spec 10.2 and 10.6: if the gate cannot decide, nothing is invoked, the call is refused and the refusal is logged."""
+    ledger = Ledger(ledger_profile())
+    p = ControlPlane(CATALOGUE, [ledger], [journal_route()], gate=AuthorityGate(budgets={"post-journal-entry": 1}), today=TODAY)
+    p.gate.overrides = {"post-journal-entry": RClass.R0}  # changed after construction
+    r = p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
+    assert r.status == "rejected" and ledger.invocations == 0
+    gate_entries = [e for e in p.log if e["kind"] == "gate"]
+    assert len(gate_entries) == 1 and gate_entries[0]["allowed"] is False and gate_entries[0]["rclass"] == "R4"
+    assert "ValueError" in gate_entries[0]["reason"] and "lower" not in gate_entries[0]["reason"]  # no detail unless values are stored
+    p.gate.overrides = {}
+    assert p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL).ok  # a refusal is not cached
+
+
 def test_concurrent_calls_with_one_key_run_the_effect_once():
     """Spec 7.1: repeating a request with the same key MUST NOT repeat its effect, including when the repeats overlap."""
     import threading
     import time
-
     class SlowLedger(Ledger):
         def invoke(self, payload, request):
             time.sleep(0.05)
             return super().invoke(payload, request)
-
     ledger = SlowLedger(ledger_profile())
     p = ControlPlane(CATALOGUE, [ledger], [journal_route()], gate=AuthorityGate(budgets={"post-journal-entry": 5}), today=TODAY)
     results, start = [], threading.Barrier(4)
-
     def worker():
         start.wait()
         results.append(p.call("post-journal-entry", JOURNAL, idempotency_key="same", **JCALL))
-
     threads = [threading.Thread(target=worker) for _ in range(4)]
     [t.start() for t in threads]
     [t.join() for t in threads]
@@ -258,15 +275,11 @@ def test_concurrent_calls_with_one_key_run_the_effect_once():
     assert p.gate.budgets["post-journal-entry"] == 4  # one budget unit, not four
     assert sum(e["kind"] == "replay" for e in p.log) == 3
     assert p._key_locks == {}  # no per-key state left behind
-
-
 def test_concurrent_calls_with_different_keys_are_not_serialised():
     """Serialising by key must not turn the control plane into a single queue."""
     import threading
     import time
-
     inside, peak, guard = [0], [0], threading.Lock()
-
     class Tracking(Ledger):
         def invoke(self, payload, request):
             with guard:
@@ -276,7 +289,6 @@ def test_concurrent_calls_with_different_keys_are_not_serialised():
             with guard:
                 inside[0] -= 1
             return super().invoke(payload, request)
-
     p = ControlPlane(CATALOGUE, [Tracking(ledger_profile())], [journal_route()],
                      gate=AuthorityGate(budgets={"post-journal-entry": 5}), today=TODAY)
     threads = [threading.Thread(target=p.call, args=("post-journal-entry", JOURNAL),
