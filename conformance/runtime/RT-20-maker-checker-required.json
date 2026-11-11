@@ -1,0 +1,47 @@
+{
+  "id": "RT-20-maker-checker-required",
+  "guarantee": "A route whose author also approved it is refused (spec 9, maker-checker).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "maker",
+        "candidates": [
+          "a"
+        ]
+      }
+    ]
+  },
+  "calls": [],
+  "expect_setup_rejected": true
+}
