@@ -28,7 +28,7 @@ Outcomes are defined so that implementations do not have to match each other's e
 | Directory | Specification | Fixtures |
 |---|---|---|
 | [`swap-drill/`](swap-drill/) | [`spec/SWAP-DRILL.md`](../spec/SWAP-DRILL.md) | SD-01 to SD-15, covering every case listed in section 8 plus invariant, count and decision consistency |
-| [`runtime/`](runtime/) | [`spec/SPEC.md`](../spec/SPEC.md) sections 7, 9, 10, 11 and 13 | RT-01 to RT-25: authority gate, eligibility filters, context lease, routing modes, maker-checker and idempotency |
+| [`runtime/`](runtime/) | [`spec/SPEC.md`](../spec/SPEC.md) sections 5 to 11 and 13 | RT-01 to RT-39: authority gate, eligibility filters, context lease, routing modes, escalation, concentration limits, output validation, maker-checker and idempotency |
 
 ## Runtime fixtures
 
@@ -60,6 +60,8 @@ The swap-drill format above describes one document. A runtime fixture describes 
 - `routes` are route documents (`schema/route.schema.json`).
 - `suppliers` are supplier profiles (spec 8.2) plus a scripted `behaviour`: `respond` returns the given output, or `error: true` fails *definitely*, with no effect. Unknown outcomes are not scripted until #27 settles their semantics. Supplier fields a fixture leaves out take these defaults: `kind` vendor, `register_ref` "TPR-1", `approved` true, `conformance_passed` true, `contract_major` 1, `contract_end` "2030-01-01", `max_data_classification` "confidential", `regions` ["SG"], `max_rclass` "R0".
 - `gate.approvals` are the approver's answers, consumed in order. If the key is absent, no approver is configured.
+- `concentration_limit` (optional) is the largest share of critical routes any one supplier may serve as primary (spec 9.4).
+- `human` suppliers (`"kind": "human"`) report no confidence; they are how cascades and escalation end.
 
 **Calls.** Each call gives the envelope fields of spec 7.1. Defaults for omitted fields: `process_id` "p", `step` "s", `principal` "agent", `accountable_role` "Process owner".
 
