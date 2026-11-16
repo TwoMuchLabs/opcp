@@ -19,7 +19,6 @@ Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, har
 - **Industry taxonomy mappings** (#2, `docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
 - The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
 
-
 ### Changes you may need to make
 
 - `evaluate_swap()` now requires the six revision arguments (`process_incumbent_revision` and the rest); a missing or blank one raises `ValueError`.
