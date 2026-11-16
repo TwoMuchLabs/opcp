@@ -16,7 +16,7 @@ import pytest
 
 from opcp._io import ValidationFailed
 from opcp._paths import data_dir
-from opcp.adapter import Adapter, AdapterResult, SupplierProfile
+from opcp.adapter import Adapter, AdapterResult, DefiniteFailure, SupplierProfile
 from opcp.contract import Contract, load_catalogue
 from opcp.gate import Approval, AuthorityGate
 from opcp.rclass import RClass
@@ -37,17 +37,28 @@ CALL_DEFAULTS = {"process_id": "p", "step": "s", "principal": "agent", "accounta
 
 
 class Scripted(Adapter):
-    """A supplier that does what the fixture says and records exactly what it received."""
+    """A supplier that does what the fixture says and records exactly what it received.
+
+    It keeps no idempotency memory of its own, unlike the ``Adapter`` base class. A fixture must pass
+    because the runtime prevented a repeat (spec 7.1), not because the test supplier deduplicated it.
+    """
 
     def __init__(self, profile: SupplierProfile, behaviour: dict):
         super().__init__(profile)
         self.behaviour = behaviour
         self.received: list[dict] = []
 
+    def call(self, payload, request):
+        result = self.invoke(payload, request)
+        self.invocations += 1
+        return result
+
     def invoke(self, payload, request):
         self.received.append(json.loads(json.dumps(payload)))
         if self.behaviour.get("error"):
-            raise RuntimeError("scripted definite failure")
+            raise DefiniteFailure("scripted definite failure")
+        if self.behaviour.get("timeout"):  # the supplier acted, but its reply never arrived
+            raise TimeoutError("scripted lost reply")
         r = self.behaviour["respond"]
         return AdapterResult(r["output"], r.get("evidence", []), r.get("confidence"), r.get("cost"))
 

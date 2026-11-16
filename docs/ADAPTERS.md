@@ -61,8 +61,12 @@ Each of these fields feeds an eligibility filter (spec 9.1). A wrong value doesn
 
 ## 4. Errors and retries
 
-- **Raise an exception when the call fails.** The control plane records it and tries the next eligible candidate.
-- **Be careful with effects.** If the supplier may have acted before the error, for example a timeout after a payment request was sent, the outcome is *unknown*. The current specification doesn't distinguish unknown from failed, and the reference runtime fails over, which can repeat the effect at another supplier. Until #27 is settled, put `transact` and `notify` capabilities on routes with a single candidate, or make sure the supplier's own idempotency covers retries.
+- **Say whether the supplier acted.** Raise `opcp.adapter.DefiniteFailure` when the supplier certainly did nothing: it refused the request, or the connection failed before the request was sent. Raise anything else, or let a timeout propagate, when the supplier *may* have acted. The outcome is then *unknown*.
+- **What the control plane does with each.** After a definite failure it tries the next eligible candidate. After an unknown outcome it depends on the capability:
+  - For R0 and R1 checks, extractions and other calls without a lasting effect, it also fails over.
+  - For R2 and above, and for every `transact` or `notify` capability, it stops. Trying another supplier could post, pay or send twice under the same idempotency key (spec 7.1, issue #27). The response is `failed`, with `outcome: "unknown"` and `supplier` naming the supplier to reconcile with. The pre-approved budget unit is not refunded.
+  - A retry with the same idempotency key goes back to that supplier only, even if the route has changed. Your adapter must pass the key on so the supplier deduplicates (section 4, below). If the supplier then reports a definite failure, the key is released and the next candidates are tried.
+- **Invalid output counts as unknown for effectful capabilities.** A payment adapter that returns a receipt the contract rejects has probably paid. Fix the mapping; the runtime won't hide it by trying another supplier.
 - **Idempotency.** The `Adapter` base class remembers results per principal, idempotency key and payload, so a repeated call doesn't reach the supplier twice within one process. That memory is not durable across restarts (#31).
 
 ## 5. Don't keep leased data

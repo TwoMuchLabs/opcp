@@ -67,6 +67,9 @@ class Response:
     supplier_id: str | None = None
     adapter_version: str | None = None
     error: str | None = None
+    # "unknown" when a supplier may have acted but the call could not be confirmed (issue #27);
+    # ``supplier_id`` then names the supplier to reconcile with.
+    outcome: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -93,4 +96,18 @@ class Response:
             doc["supplier"] = {"id": self.supplier_id, "adapter_version": self.adapter_version or "unknown"}
         if self.error is not None:
             doc["error"] = self.error
+        if self.outcome is not None:
+            doc["outcome"] = self.outcome
         return doc
+
+    @classmethod
+    def from_dict(cls, doc: dict[str, Any]) -> "Response":
+        """The inverse of :meth:`to_dict`, for responses read back from a store."""
+        supplier = doc.get("supplier") or {}
+        return cls(
+            trace_id=doc["trace_id"], status=doc["status"], rclass=doc["rclass"],
+            route_mode=doc["route"]["mode"], route_reason=doc["route"]["reason"], latency_ms=doc["latency_ms"],
+            output=doc.get("output"), evidence=list(doc.get("evidence", [])), confidence=doc.get("confidence"),
+            cost=doc.get("cost"), supplier_id=supplier.get("id"), adapter_version=supplier.get("adapter_version"),
+            error=doc.get("error"), outcome=doc.get("outcome"),
+        )

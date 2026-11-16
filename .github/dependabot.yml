@@ -1,0 +1,7 @@
+# Keeps the pinned action SHAs in the workflows current: a weekly pull request when an action releases.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
