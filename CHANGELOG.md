@@ -20,8 +20,8 @@ Supplier portability becomes something you can test, not just assess.
 - **Sponsor readout** (`opcp scorecard readout`). A two-page, printable pack for the pilot's decision meeting. It shows a grid of every critical process against the seven measures, summary tiles (ratings, evidence coverage, proven swaps, largest supplier share), the decisions for the sponsor in order of urgency, and each renewing contract's last day to give notice (end date minus notice period). Release builds attach an example readout.
 - **OCEL 2.0 export** (`opcp ocel`, `docs/PROCESS-MINING.md`). Converts an exported event log to OCEL 2.0 JSON for process-mining tools. Requests, capabilities, processes and suppliers become objects, and each log entry becomes an event linked to them. No input or output values are exported unless the log holds them. Checked by reading the demo log with PM4Py's OCEL 2.0 reader.
 - **Fix:** the control plane now uses the event log it is given, even when that log is empty.
-- **Industry taxonomy mappings** (`docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain. APQC PCF mappings are left empty until checked against the PCF download.
-- The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 and OCEL 2.0 as the intended import and export formats.
+- **Industry taxonomy mappings** (`docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
+- The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
 
 ## 0.2.0 (draft) — 2026-10-24
 

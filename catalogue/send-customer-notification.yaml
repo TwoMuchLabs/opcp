@@ -28,7 +28,7 @@ mappings:
     ref: Correspondence
     version: "14.0.0"
     relation: closest
-    source: https://github.com/bian-official/public/tree/main/release14.0.0
+    source: https://github.com/bian-official/public/blob/b58bf4c2c300dd018afc084e9bb24b7adaaa3500/release14.0.0/semantic-apis/oas3%20/yamls/Correspondence.yaml
 examples:
   - name: Onboarding complete
     input: {recipient_ref: CUST-000123, channel: email, template_id: onboarding-complete-v2, variables: {first_name: Alex}}

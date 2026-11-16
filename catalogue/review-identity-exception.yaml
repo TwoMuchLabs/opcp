@@ -30,8 +30,8 @@ mappings:
     ref: Customer Case
     version: "14.0.0"
     relation: partial
-    source: https://github.com/bian-official/public/tree/main/release14.0.0
-    note: A human review of a failed check handled as a case.
+    source: https://github.com/bian-official/public/blob/b58bf4c2c300dd018afc084e9bb24b7adaaa3500/release14.0.0/semantic-apis/oas3%20/yamls/CustomerCase.yaml
+    note: A human review of a failed check, handled as one case. Customer Case Management is the other candidate, but it manages case load and resources across cases, not the case itself.
 examples:
   - name: Low-confidence match
     input: {case_ref: IDV-2026-000981, referral_reason: low_confidence}

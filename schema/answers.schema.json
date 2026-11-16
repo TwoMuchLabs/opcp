@@ -36,17 +36,7 @@
             "additionalProperties": {
               "oneOf": [
                 {"type": "null"},
-                {
-                  "type": "object",
-                  "required": ["ref", "source"],
-                  "properties": {
-                    "ref": {"type": "string", "minLength": 1},
-                    "source": {"type": "string", "format": "uri"},
-                    "version": {"type": "string"},
-                    "relation": {"enum": ["exact", "closest", "partial"]},
-                    "note": {"type": "string"}
-                  }
-                }
+                {"$ref": "#/$defs/mapping"}
               ]
             }
           },
@@ -70,6 +60,18 @@
     }
   },
   "$defs": {
+    "mapping": {
+      "description": "A pointer to one item in an external taxonomy (docs/TAXONOMIES.md). Defined identically in the capability, answers and scorecard schemas, so each validates on its own; tests/test_taxonomy_mappings.py keeps the three identical.",
+      "type": "object",
+      "required": ["ref", "source"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1, "description": "Identifier or name in the external scheme, such as an APQC PCF element ID or a BIAN service domain name."},
+        "source": {"type": "string", "format": "uri", "description": "Where the item can be checked: a link to the item itself, at a fixed release or commit."},
+        "version": {"type": "string", "description": "Version or release of the external scheme, such as 8.0 or 14.0.0."},
+        "relation": {"enum": ["exact", "closest", "partial"], "description": "How closely this item matches the external one. Read as closest when omitted."},
+        "note": {"type": "string"}
+      }
+    },
     "person": {
       "type": "object",
       "required": ["name"],
