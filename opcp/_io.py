@@ -23,13 +23,49 @@ _StringDateLoader.yaml_implicit_resolvers = {
 }
 
 
+# YAML aliases can make a small file expand into an enormous document ("billion laughs"); the
+# expansion happens when the document is validated or serialised, not when it is parsed. No OPCP
+# document comes anywhere near this many values.
+MAX_YAML_NODES = 1_000_000
+
+
+def _expanded_size(root: yaml.Node) -> int:
+    """How many nodes the document has once every alias is expanded (shared nodes counted each time)."""
+    memo: dict[int, int] = {}
+
+    def size(node: yaml.Node) -> int:
+        key = id(node)
+        if key in memo:
+            return memo[key]
+        memo[key] = 1  # a self-referencing alias counts once rather than looping
+        if isinstance(node, yaml.MappingNode):
+            total = 1 + sum(size(k) + size(v) for k, v in node.value)
+        elif isinstance(node, yaml.SequenceNode):
+            total = 1 + sum(size(item) for item in node.value)
+        else:
+            total = 1
+        memo[key] = total
+        return total
+
+    return size(root)
+
+
 def load_document(path: str | Path) -> Any:
     """Load a YAML or JSON file."""
     path = Path(path)
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() == ".json":
         return json.loads(text)
-    return yaml.load(text, Loader=_StringDateLoader)  # noqa: S506 - safe loader subclass
+    loader = _StringDateLoader(text)  # a safe loader subclass
+    try:
+        node = loader.get_single_node()
+        if node is None:
+            return None
+        if _expanded_size(node) > MAX_YAML_NODES:
+            raise ValidationFailed(str(path), [f"expands to more than {MAX_YAML_NODES:,} values through YAML aliases"])
+        return loader.construct_document(node)
+    finally:
+        loader.dispose()
 
 
 # JSON Schema 2020-12 treats "format" as an annotation unless a validator chooses to assert it, and
