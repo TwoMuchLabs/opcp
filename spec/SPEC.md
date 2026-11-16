@@ -118,7 +118,7 @@ Every capability call uses one request envelope and one response envelope, defin
 |---|---|---|
 | `envelope_version` | yes | `"0.1"`. |
 | `trace_id` | yes | Unique identifier for this call, carried into every log entry. |
-| `idempotency_key` | yes | Scoped to the capability and principal. Repeating a request with the same key and input **MUST NOT** repeat its effect; reusing a key with different input **MUST** be refused. A runtime **MUST NOT** replay a rejected or failed response, so that a retry after approval or recovery can succeed. |
+| `idempotency_key` | yes | Scoped to the capability and principal. Repeating a request with the same key and input **MUST NOT** repeat its effect; reusing a key with different input **MUST** be refused. A runtime **MUST NOT** replay a rejected or failed response, so that a retry after approval or recovery can succeed. After a response with `outcome: unknown`, the key stays bound to its input and to the supplier that may have acted (Section 9.5). |
 | `capability` | yes | `{id, version}` of the contract. |
 | `process` | yes | `{id, step}` that made the call. |
 | `principal` | yes | Who the call acts for: a user, team or system identity. |
@@ -140,7 +140,8 @@ Every capability call uses one request envelope and one response envelope, defin
 | `confidence` | no | 0 to 1, where the supplier can state one. |
 | `cost` | no | `{amount, currency}`. |
 | `latency_ms` | yes | Elapsed time of the call. |
-| `supplier` | yes when `ok` or `escalated` | `{id, adapter_version}`. |
+| `supplier` | yes when `ok` or `escalated`, or with `outcome` | `{id, adapter_version}`. With `outcome: unknown`, the supplier that may have acted. |
+| `outcome` | with `failed`, when a supplier may have acted | `unknown`: a supplier may have performed the effect, but the runtime could not confirm it (Section 9.5). |
 | `rclass` | yes | Reversibility Class applied by the gate. |
 | `route` | yes | `{mode, reason}`: why this supplier was chosen. |
 
@@ -154,6 +155,7 @@ An adapter connects one supplier to one capability contract.
 4. An adapter **MUST NOT** retain leased input beyond `lease_expires_at`, or beyond the call if none is given, except where the supplier contract explicitly permits it and the permission is recorded in the supplier profile.
 5. An adapter **SHOULD** report cost and confidence.
 6. Adapters are shared assets. A deployment **SHOULD** configure existing adapters rather than write new ones for each process.
+7. An adapter **MUST** distinguish a **definite failure**, where the supplier certainly did not act, from an **unknown outcome**, where it may have acted. A timeout, a transport error after the request was sent, or a reply that cannot be read is an unknown outcome unless the adapter can show that the supplier did not act.
 
 ## 9. Routing
 
@@ -186,7 +188,7 @@ Among eligible suppliers, a route selects according to its mode. Where a mode us
 
 | Mode | Behaviour | When to use it *(informative)* |
 |---|---|---|
-| `pinned` | Use the primary supplier; on failure, try fallbacks in order. | The default for regulated work, where each supplier is a third-party arrangement and changes are deliberate. |
+| `pinned` | Use the primary supplier; after a definite failure, try fallbacks in order (Section 9.5). | The default for regulated work, where each supplier is a third-party arrangement and changes are deliberate. |
 | `segmented` | Try the request segment's suppliers first, e.g. by country or risk band, then the default candidates as fallbacks. | Different suppliers by market, language or product. |
 | `cascade` | Try suppliers in order; move to the next when confidence is below a threshold. The last step **SHOULD** be a human supplier. | Identity checks and document extraction. |
 | `weighted` | Split traffic by weight. | Migrations and shadow drills. |
@@ -197,6 +199,19 @@ Supplier kind is independent of archetype. A human team **MAY** fulfil any contr
 ### 9.4 Concentration limits
 
 A business **MAY** set a concentration limit: the largest share of its critical processes that any one supplier may fulfil as primary. A runtime or registry **MUST** reject a route change that would breach the limit, unless the breach is recorded as an approved exception.
+
+### 9.5 Unknown outcomes
+
+A call has a **lasting effect** when the Reversibility Class applied by the gate is R2 or above, or the contract's archetype is `transact` or `notify`. For such a call:
+
+1. After an attempt whose outcome is unknown (Section 8.7), or whose reply the runtime does not accept (output that fails validation, missing evidence, or a confidence below a cascade threshold), a runtime **MUST NOT** invoke any other supplier for that request. This includes fallbacks, segment defaults, cascade steps and the escalation supplier.
+2. The runtime **MUST** return `status: failed` with `outcome: unknown` and `supplier` naming the supplier that may have acted, and **MUST** record the unknown outcome in the event log.
+3. A later request with the same idempotency key and input **MUST** go to that supplier first, even if the route has changed. It **MUST NOT** go to any other supplier unless that supplier reports a definite failure. If that supplier is not eligible, the runtime **MUST** return `failed` with `outcome: unknown` again.
+4. A request with the same idempotency key and different input **MUST** be refused.
+
+For a call without a lasting effect, a runtime **MAY** treat an unknown outcome as a definite failure and fail over. *(informative)* Repeating a check or an extraction has no effect outside the working context, and failing over keeps those capabilities available.
+
+*(informative)* An unknown outcome is not a supplier failure to hide. Failing over would repeat the effect at a supplier that has never seen the idempotency key, so the adapter idempotency rule (Section 8.3) cannot prevent it. The supplier that may have acted is the only party that can say whether it did.
 
 ## 10. Authority gate
 
@@ -214,6 +229,8 @@ Every capability call **MUST** pass the authority gate before any supplier is in
 | R2 | Require approval, or allow within a pre-approved budget. |
 | R3 | Require explicit approval for each call. |
 | R4 | Never autonomous; require approval, and a second approver for high-stakes disclosures. |
+
+A pre-approved budget bounds the number of effects. A runtime **MAY** return a budget unit when the call it authorised ends with a definite failure, or without reaching a supplier, and **MUST NOT** return it after an unknown outcome (Section 9.5).
 
 5. Every step performed by an AI agent **MUST** name the accountable human role in the process specification, and the gate **MUST** record it with each decision. *(informative)* The reference runtime requires an accountable role on every call by default, which is stricter than this rule.
 6. Every gate decision **MUST** be written to the event log, including the class, the decision, who approved and why.
@@ -300,7 +317,7 @@ The research behind each measure is summarised in [`docs/EVIDENCE.md`](../docs/E
 ## 13. Conformance
 
 - **Adapter conformance.** For each contract example, the adapter's output validates against the contract output schema and the archetype's required fields; evidence is present where required; and a repeated idempotency key does not repeat the effect.
-- **Runtime conformance.** The runtime applies the authority gate before any supplier call, enforces every eligibility filter, enforces the context lease at every depth, refuses `best_score` above R1, fails closed for unknown capabilities, honours and scopes idempotency keys, and writes every gate decision to the event log.
+- **Runtime conformance.** The runtime applies the authority gate before any supplier call, enforces every eligibility filter, enforces the context lease at every depth, refuses `best_score` above R1, fails closed for unknown capabilities, honours and scopes idempotency keys, never invokes a second supplier after an unknown outcome on a call with a lasting effect, and writes every gate decision to the event log.
 
 The reference implementation includes runners for both (`opcp.conformance.check_adapter` and `opcp.conformance.check_runtime`).
 
@@ -325,3 +342,4 @@ The reference implementation includes runners for both (`opcp.conformance.check_
 4. Should the scorecard include an operational baseline (cycle time, straight-through rate, cost per case, exception rate) as a required section, or keep it optional as in v0.1?
 5. How should process variants by country or legal entity be expressed in a process specification?
 6. Rule 10.3 treats data leased to an approved, contracted supplier as governed by eligibility rather than as a disclosure. Is that consistent with the disclosure definition in *Reversibility Classes for Agent Actions*, or should that specification add a defined category for contracted processors?
+7. Should a deployment be able to configure a reconciliation step after an unknown outcome, for example a `retrieve` capability that asks the supplier what happened, before the caller retries?

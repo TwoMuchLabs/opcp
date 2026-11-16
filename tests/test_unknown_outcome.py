@@ -291,3 +291,15 @@ def test_reserved_adapter_removed_from_configuration_still_names_the_supplier():
     retry = p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
     assert retry.outcome == "unknown" and retry.supplier_id == "A" and posted == ["A"]
     assert "no longer configured" in retry.error
+
+
+def test_schema_requires_failed_status_and_supplier_with_outcome():
+    schema = json.loads((data_dir("schema") / "envelope.schema.json").read_text(encoding="utf-8"))
+    validator = validator_for({**schema, "$ref": "#/$defs/response"})
+    base = {"envelope_version": "0.1", "trace_id": "t", "latency_ms": 1, "rclass": "R2",
+            "route": {"mode": "pinned", "reason": "r"}, "outcome": "unknown"}
+    supplier = {"id": "A", "adapter_version": "1"}
+    assert not errors(validator, {**base, "status": "failed", "supplier": supplier})
+    assert errors(validator, {**base, "status": "failed"})  # who to reconcile with is required
+    assert errors(validator, {**base, "status": "ok", "supplier": supplier, "output": {}})
+    assert errors(validator, {**base, "status": "failed", "supplier": supplier, "outcome": "maybe"})

@@ -62,10 +62,12 @@
           "required": ["mode", "reason"],
           "properties": {"mode": {"type": "string"}, "reason": {"type": "string"}}
         },
-        "error": {"type": "string"}
+        "error": {"type": "string"},
+        "outcome": {"const": "unknown", "description": "A supplier may have acted, but the runtime could not confirm it (spec 9.5)."}
       },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "ok"}}}, "then": {"required": ["output", "supplier"]}}
+        {"if": {"properties": {"status": {"const": "ok"}}}, "then": {"required": ["output", "supplier"]}},
+        {"if": {"required": ["outcome"]}, "then": {"properties": {"status": {"const": "failed"}}, "required": ["supplier"]}}
       ]
     }
   }

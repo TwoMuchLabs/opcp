@@ -1,6 +1,6 @@
 {
   "id": "RT-40-no-failover-after-unknown-outcome",
-  "guarantee": "When a supplier of a transact capability may have acted but no reply arrived, the runtime does not try another supplier: that would repeat the effect under the same idempotency key (spec 7.1; issue #27). The call fails and names the supplier to reconcile with.",
+  "guarantee": "When a supplier of a transact capability may have acted but no reply arrived, the runtime does not try another supplier: that would repeat the effect under the same idempotency key (spec 7.1, 9.5). The call fails and names the supplier to reconcile with.",
   "setup": {
     "today": "2026-11-07",
     "contracts": [

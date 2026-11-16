@@ -1,6 +1,6 @@
 {
   "id": "RT-41-no-failover-after-invalid-reply-to-transact",
-  "guarantee": "A transact supplier that replies with output the contract rejects may still have acted, so the runtime does not try another supplier (spec 7.1, 7.2; issue #27).",
+  "guarantee": "A transact supplier that replies with output the contract rejects may still have acted, so the runtime does not try another supplier (spec 9.5).",
   "setup": {
     "today": "2026-11-07",
     "contracts": [

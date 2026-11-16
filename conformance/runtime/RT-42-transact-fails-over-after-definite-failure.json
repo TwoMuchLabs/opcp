@@ -1,6 +1,6 @@
 {
   "id": "RT-42-transact-fails-over-after-definite-failure",
-  "guarantee": "A transact capability still fails over when the primary supplier certainly did nothing (spec 9.3 pinned).",
+  "guarantee": "A transact capability still fails over when the primary supplier certainly did nothing (spec 9.3 pinned, 9.5).",
   "setup": {
     "today": "2026-11-07",
     "contracts": [

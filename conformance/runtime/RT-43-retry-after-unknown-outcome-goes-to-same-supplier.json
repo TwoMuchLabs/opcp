@@ -1,6 +1,6 @@
 {
   "id": "RT-43-retry-after-unknown-outcome-goes-to-same-supplier",
-  "guarantee": "A retry with the same idempotency key after an unknown outcome goes back to the supplier that may have acted, never to another (spec 7.1, 8.3; issue #27).",
+  "guarantee": "A retry with the same idempotency key after an unknown outcome goes back to the supplier that may have acted, never to another (spec 9.5).",
   "setup": {
     "today": "2026-11-07",
     "contracts": [
