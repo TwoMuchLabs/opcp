@@ -27,7 +27,8 @@ Messages below are the reference runtime's, quoted from the code. The response `
 |---|---|
 | `rejected` · `no contract for '…'; treated as R4` | The capability has no contract, so it fails closed (spec 10.2). Check the capability id. |
 | `rejected` · `… requires approval and no approver is configured` | The class needs approval (R2 without budget, R3, R4). Configure an approver or an R2 budget on the `AuthorityGate`. |
-| `rejected` · `R4 requires a second, different approver` | Two-person R4 is on and the approver didn't give a second, different person. |
+| `rejected` · `R4 requires a second, different approver` | Two-person R4 is on and the approver didn't give a second, different person. Identities are compared ignoring case, spacing, Unicode form and invisible characters, so `alice` and `Alice ` are one person. |
+| `rejected` · `approval names no approver; treated as declined` | The approver callback approved but left `by` empty, blank or invisible. Every approval must say who gave it. |
 | `rejected` · `idempotency key already used for a different input` | Same key, different payload. Use a new key for a new request. |
 | `failed` · `no accountable human role named for this step (spec 10.5)` | Pass `accountable_role=…` on the call. The reference runtime requires it on every call. |
 | `failed` · `input is …; contract accepts at most …` | The declared classification exceeds the contract's. |
