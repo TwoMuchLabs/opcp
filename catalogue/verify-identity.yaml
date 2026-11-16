@@ -32,8 +32,13 @@ output:
     reason_codes: {type: array, items: {type: string}}
     match_score: {type: number, minimum: 0, maximum: 1}
 mappings:
-  apqc_pcf: null           # To map, with a cited source.
-  bian_service_domain: null
+  apqc_pcf: null           # To map against the PCF download, with its attribution; see docs/TAXONOMIES.md.
+  bian_service_domain:
+    ref: Party Lifecycle Management
+    version: "14.0.0"
+    relation: partial
+    source: https://github.com/bian-official/public/blob/b58bf4c2c300dd018afc084e9bb24b7adaaa3500/release14.0.0/semantic-apis/oas3%20/yamls/PartyLifecycleManagement.yaml
+    note: BIAN covers the checks made when a new party relationship is established; identity verification is one of them.
 examples:
   - name: Straightforward passport check
     input:

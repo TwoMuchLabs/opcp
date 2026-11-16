@@ -93,7 +93,7 @@ A capability contract is a YAML or JSON document that **MUST** validate against 
 | `data_classification` | yes | Highest data classification the input may contain: `public`, `internal`, `confidential` or `restricted`. |
 | `evidence_required` | no | `true` if every response must include evidence. Default `true` for `check` and `transact`. |
 | `service_level` | no | Target `latency_ms_p95` and `availability`. |
-| `mappings` | no | References to external taxonomies, such as `apqc_pcf` and `bian_service_domain`. Each value **MUST** cite its source or be left empty. |
+| `mappings` | no | References to external taxonomies, keyed by scheme, such as `apqc_pcf`, `bian_service_domain` and `iso20022`. Each value **MUST** give a `ref` and a `source` it can be checked against, or be left empty, and **MAY** give the scheme `version`, a `relation` (`exact`, `closest` or `partial`) and a `note`. A mapping is a pointer, not a copy: implementations **MUST NOT** require the external scheme's text to be present. The same shape is allowed on processes in a scorecard assessment or answers file. See [docs/TAXONOMIES.md](../docs/TAXONOMIES.md). |
 | `examples` | yes | At least one example input used by the conformance suite. |
 
 ### 6.2 Versioning
@@ -313,7 +313,8 @@ The reference implementation includes runners for both (`opcp.conformance.check_
 ## 15. Relationship to other work *(informative)*
 
 - **Reversibility Classes for Agent Actions** supplies the R0–R4 vocabulary used by the authority gate.
-- **The APQC Process Classification Framework** and, for banks, **BIAN service domains** are suitable taxonomies for organising process registries and capability catalogues.
+- **The APQC Process Classification Framework** and, for banks, **BIAN service domains** are suitable taxonomies for organising process registries and capability catalogues. **ISO 20022** message identifiers suit `transact` capabilities that move money. OPCP refers to these by identifier rather than copying them; [docs/TAXONOMIES.md](../docs/TAXONOMIES.md) sets out which schemes may be bundled, which may only be referenced, and why.
+- **BPMN 2.0** is the intended format for importing process models into a registry; it is not implemented yet. **OCEL 2.0** is the format for exporting the event log to process-mining tools; the reference implementation provides it (`opcp ocel`).
 - **The Model Context Protocol (MCP)** is a suitable transport for adapters that wrap AI tools; OPCP contracts describe *what* a capability does, independent of transport.
 - **Regulation.** The scorecard is designed to support, not replace, obligations such as the EU Digital Operational Resilience Act, under which European supervisors [designated critical ICT third-party providers](https://www.esma.europa.eu/press-news/esma-news/european-supervisory-authorities-designate-critical-ict-third-party-providers) in November 2025; APRA's Prudential Standard CPS 230 in Australia, which commenced on 1 July 2025; and the Monetary Authority of Singapore's Guidelines on Third-Party Risk Management, [proposed for consultation in March 2026](https://www.mondaq.com/financial-services/1809374/extending-the-regulatory-perimeter-beyond-outsourcing-mas-proposed-third-party-risk-management-guidelines-and-lessons-from-australias-cps-230). Nothing in this specification is legal or regulatory advice.
 

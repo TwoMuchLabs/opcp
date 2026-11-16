@@ -139,7 +139,7 @@ def convert_process(bank: Bank, proc: Mapping[str, Any], where: str) -> tuple[Pr
     for qid in answers:
         if qid not in bank.questions:
             problems.append(f"{where}: unknown question {qid}")
-    fields: dict[str, Any] = {k: proc[k] for k in ("id", "name", "owner", "supplier", "capability", "archetype", "notes") if k in proc}
+    fields: dict[str, Any] = {k: proc[k] for k in ("id", "name", "owner", "supplier", "capability", "archetype", "notes", "mappings") if k in proc}
     refs: dict[str, list[str]] = {}
 
     for q in bank.questions.values():
