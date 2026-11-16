@@ -35,6 +35,7 @@ Messages below are the reference runtime's, quoted from the code. The response `
 | `failed` · `no eligible supplier: …` | Every candidate failed an eligibility filter; the reasons follow (see below). |
 | `failed` · `…: invalid output (…)` | The supplier's output failed the contract schema, the archetype's fields or the evidence requirement. See [ADAPTERS.md](ADAPTERS.md). |
 | `failed` · `…: error (…)` | The adapter raised. With values off, only the exception type is logged. |
+| `failed` · `outcome unknown at …` | A supplier of an effectful capability (R2+, `transact` or `notify`) may have acted, but sent no reply (`no confirmed reply`) or one the contract rejects (`invalid output`), so no other supplier was tried (issue #27). `supplier` in the response names it. Check with that supplier whether the effect happened, or retry with the same idempotency key, which goes back to it only. If the adapter knows the supplier did nothing, it should raise `DefiniteFailure`; an invalid output means the adapter's mapping needs fixing. See [ADAPTERS.md](ADAPTERS.md). |
 | `failed` · `best_score routing is not allowed for … capabilities (spec 9.3)` | `best_score` is limited to R0 and R1. |
 
 ## Why a supplier was excluded (spec 9.1)

@@ -48,6 +48,17 @@ class SupplierProfile:
         return self.quality.get("default", 0.0)
 
 
+class DefiniteFailure(Exception):
+    """Raise from :meth:`Adapter.invoke` when the supplier certainly did not act.
+
+    Examples: the supplier refused the request before doing anything, or the connection failed before
+    the request was sent. Any other exception, a timeout included, leaves the outcome *unknown*: the
+    supplier may have acted. For a capability with a lasting effect (Reversibility Class R2 or above, or
+    the ``transact`` or ``notify`` archetype) the control plane then does not try another supplier, because
+    that could repeat the effect (issue #27). For other capabilities both kinds of error fail over.
+    """
+
+
 @dataclass
 class AdapterResult:
     output: dict[str, Any]

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Security fix (critical, issue #27): no failover after an unknown outcome.** When a supplier of an effectful capability (Reversibility Class R2 or above, or the `transact` or `notify` archetype) may have acted but sent no usable reply (a timeout, a dropped connection, or output the contract rejects), the control plane used to try the next supplier. A payment or ledger posting could then happen twice, at two suppliers, while the response reported one success. Now:
+  - the call stops with `status: failed`, `outcome: "unknown"`, and `supplier` naming the supplier to reconcile with;
+  - the attempt is logged with `outcome: "unknown"`, and the pre-approved R2 budget unit is not refunded;
+  - a retry with the same idempotency key goes back to that supplier only, even if the route has changed, and a different input under that key is refused;
+  - adapters raise the new `opcp.adapter.DefiniteFailure` when the supplier certainly did nothing, which still fails over as before.
+
+  Calls without a lasting effect (R0 and R1 checks, extractions, retrievals) fail over as before after any error. The specification text that makes this normative is proposed separately for the 14-day review. New runtime conformance fixtures RT-40 to RT-43. **Who is affected:** anyone on 0.3.0 or earlier with an effectful capability on a route with more than one supplier, or with an escalation supplier. If you can't upgrade, give those capabilities a single candidate and no escalation.
 - **Release workflow can be re-run safely.** Re-running a release for an existing tag builds that tag's commit, refreshes the GitHub release instead of failing because it exists, reuses PyPI's files when the version is already published, and stops rather than replace any published wheel or source archive. PyPI publishes only after the GitHub release succeeds, versions, notes and changelog are checked before building, new tags are cut only from `main`, and runs for the same tag queue. See `docs/RELEASING.md`.
 - **Fix:** a gate override that would lower a capability's Reversibility Class is now rejected when the control plane is built, and if the authority gate raises an error during a call, the call is refused as R4 and the refusal is written to the event log. Before, the error escaped `ControlPlane.call()` with no gate entry logged (spec 10.2, 10.6).
 - **Fix:** concurrent calls with the same capability, principal and idempotency key could all reach the supplier. The control plane now runs them one at a time: the first executes, the rest replay its result (or are refused if their input differs). Calls with different keys still run concurrently. Idempotency is still held in memory only; durability across restarts is a separate, specification-level question.
