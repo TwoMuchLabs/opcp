@@ -1,0 +1,85 @@
+{
+  "id": "RT-17-best-score-refused-above-r1",
+  "guarantee": "best_score routing is refused for a capability above R1, and no supplier is invoked (spec 9.3).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "post-journal-entry"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "l",
+        "supplier_id": "L",
+        "capability": "post-journal-entry",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "receipt_id": "rcpt-1",
+              "status": "completed",
+              "compensation": "post a reversing entry"
+            },
+            "evidence": [
+              {
+                "type": "ledger",
+                "reference": "gl-1"
+              }
+            ]
+          }
+        },
+        "max_rclass": "R2",
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "post-journal-entry",
+        "version": 1,
+        "mode": "best_score",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "l"
+        ]
+      }
+    ],
+    "gate": {
+      "budgets": {
+        "post-journal-entry": 1
+      }
+    }
+  },
+  "calls": [
+    {
+      "capability": "post-journal-entry",
+      "input": {
+        "entry_date": "2026-10-31",
+        "currency": "SGD",
+        "lines": [
+          {
+            "account": "6100",
+            "debit": 10,
+            "credit": 0
+          },
+          {
+            "account": "2100",
+            "debit": 0,
+            "credit": 10
+          }
+        ]
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "failed",
+        "supplier": null,
+        "rclass": "R2"
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "l": 0
+    }
+  }
+}

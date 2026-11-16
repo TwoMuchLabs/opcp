@@ -1,0 +1,100 @@
+{
+  "id": "RT-31-no-eligible-supplier-escalates",
+  "guarantee": "With no eligible candidate, the call is escalated to the route's escalation supplier (spec 9.1).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        },
+        "approved": false
+      },
+      {
+        "adapter_id": "team",
+        "supplier_id": "TEAM",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "refer",
+              "reason_codes": [
+                "manual-review"
+              ]
+            },
+            "evidence": [
+              {
+                "type": "case",
+                "reference": "c1"
+              }
+            ]
+          }
+        },
+        "kind": "human"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a"
+        ],
+        "escalation": "team"
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "verify-identity",
+      "input": {
+        "full_name": "Alex Tan",
+        "date_of_birth": "1990-04-12",
+        "document": {
+          "type": "passport",
+          "number": "K1234567",
+          "issuing_country": "SG"
+        }
+      },
+      "data_classification": "confidential",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "escalated",
+        "supplier": "TEAM",
+        "rclass": "R0",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 0,
+      "team": 1
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Command-line interface: ``opcp scorecard``, ``opcp validate``, ``opcp conformance-demo``, ``opcp demo``."""
+"""Command-line interface: ``opcp scorecard``, ``opcp validate``, ``opcp conformance-demo``, ``opcp demo`` and ``opcp swap-demo``."""
 
 from __future__ import annotations
 
@@ -70,6 +70,18 @@ def _scorecard_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _scorecard_readout(args: argparse.Namespace) -> int:
+    from .readout import readout_file
+
+    path = Path(args.output)
+    if path.exists() and not args.force:
+        print(f"{path} already exists. Use --force to overwrite.", file=sys.stderr)
+        return 1
+    path.write_text(readout_file(args.path), encoding="utf-8")
+    print(f"Readout written to {path}. Open it in a browser; print it to PDF for the meeting.")
+    return 0
+
+
 def _scorecard_form(args: argparse.Namespace) -> int:
     import json
 
@@ -129,6 +141,64 @@ def _conformance_demo(args: argparse.Namespace) -> int:
     return 0 if ok and runtime.passed else 1
 
 
+def _ocel(args: argparse.Namespace) -> int:
+    from .ocel import export_file
+
+    text = export_file(args.path)
+    path = Path(args.output)
+    if path.exists() and not args.force:
+        print(f"{path} already exists. Use --force to overwrite.", file=sys.stderr)
+        return 1
+    path.write_text(text, encoding="utf-8")
+    print(f"Wrote an OCEL 2.0 event log to {path}. Open it in a process-mining tool that reads OCEL 2.0 JSON.")
+    return 0
+
+
+def _log_verify(args: argparse.Namespace) -> int:
+    from .eventlog import verify_file
+
+    result = verify_file(args.path, args.head)
+    if result.ok:
+        print(f"Chain intact: {result.entries} entries. Head {result.head}")
+        if args.head is None:
+            print("Without --head, entries removed from the end cannot be detected. Keep the head somewhere else.")
+        return 0
+    where = f" at line {result.line}" if result.line else ""
+    print(f"Chain broken{where}: {result.problem}. {result.entries} entries verified before it.", file=sys.stderr)
+    return 1
+
+
+def _swap_demo(args: argparse.Namespace) -> int:
+    import json
+
+    from .swap import SwapCase, evaluate_swap
+
+    cases = (
+        SwapCase("clean-sme", "pass", "pass", "pass", 0.98, 0.97),
+        SwapCase("name-mismatch", "refer", "refer", "refer", 0.91, 0.90),
+        SwapCase("sanctions-hit", "fail", "fail", "fail", 0.99, 0.99),
+        SwapCase("low-confidence-document", "refer", "refer", "refer", 0.62, 0.65),
+    )
+    result = evaluate_swap(
+        capability="extract-application-documents",
+        incumbent="supplier-a",
+        candidate="supplier-b",
+        cases=cases,
+        measured_seconds=2.5 * 24 * 3600,
+    )
+    evidence = result.evidence()
+    print(json.dumps(evidence, indent=2))
+    return 0 if result.passed else 1
+
+
+def _swap_drill(args: argparse.Namespace) -> int:
+    from .swap_drill import run_swap_drill
+
+    result = run_swap_drill(args.path)
+    print(__import__("json").dumps(result, indent=2, sort_keys=True))
+    return 0 if result["promotion_ready"] else 1
+
+
 def _shadow_report(args: argparse.Namespace) -> int:
     import json
 
@@ -162,6 +232,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path", nargs="?", default="assessment-form.html")
     p.add_argument("--force", action="store_true", help="Overwrite an existing file")
     p.set_defaults(func=_scorecard_form)
+    p = scs.add_parser("readout", help="Write the sponsor readout: decisions, renewals and a one-page grid")
+    p.add_argument("path")
+    p.add_argument("-o", "--output", default="readout.html", help="Where to write the HTML (default: readout.html)")
+    p.add_argument("--force", action="store_true", help="Overwrite an existing file")
+    p.set_defaults(func=_scorecard_readout)
     p = scs.add_parser("export", help="Suggest regulatory register values (EU DORA) from an assessment")
     p.add_argument("path")
     p.add_argument("--register", choices=["dora"], default="dora", help="Which register (only dora for now)")
@@ -178,6 +253,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=_validate)
 
+    p = sub.add_parser("ocel", help="Convert an exported event log (JSON lines) to OCEL 2.0 JSON for process mining")
+    p.add_argument("path")
+    p.add_argument("-o", "--output", default="events.ocel.json", help="Where to write (default: events.ocel.json)")
+    p.add_argument("--force", action="store_true", help="Overwrite an existing file")
+    p.set_defaults(func=_ocel)
+
+    p = sub.add_parser("log", help="Work with an exported event log")
+    lg = p.add_subparsers(dest="action", required=True)
+    p = lg.add_parser("verify", help="Check a hash-chained event log for changed, inserted, removed or reordered entries")
+    p.add_argument("path")
+    p.add_argument("--head", help="The head hash recorded elsewhere, to also detect entries removed from the end")
+    p.set_defaults(func=_log_verify)
+
     p = sub.add_parser("shadow-report", help="Summarise a shadow drill from an exported event log (JSON lines)")
     p.add_argument("path")
     p.add_argument("--json", action="store_true", help="Print machine-readable results")
@@ -187,6 +275,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_demo)
     p = sub.add_parser("conformance-demo", help="Run adapter and runtime conformance checks")
     p.set_defaults(func=_conformance_demo)
+    p = sub.add_parser("swap-demo", help="Run the first AI supplier swap-drill demonstration")
+    p.set_defaults(func=_swap_demo)
+    p = sub.add_parser("swap-drill", help="Evaluate an OPCP v0.3 swap-drill evidence record")
+    p.add_argument("path")
+    p.set_defaults(func=_swap_drill)
     return parser
 
 

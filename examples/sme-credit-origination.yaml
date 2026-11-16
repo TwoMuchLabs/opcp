@@ -1,0 +1,104 @@
+# Provisional process-pack format, shown with an SME credit origination example.
+# This file is intentionally human-readable while the process-pack schema is
+# being designed. It is not yet normative OPCP specification material.
+
+opcp_version: "0.2"
+process:
+  id: sme-credit-origination
+  version: "0.1.0"
+  name: SME Credit Origination
+  owner_role: SME Lending Operations
+  objective: Originate an SME credit application with bounded AI assistance and human accountability.
+
+  variation_points:
+    - id: market
+      values: [SG, IN]
+    - id: entity_type
+      values: [company, partnership, sole_proprietor]
+    - id: product
+      values: [working_capital, term_loan]
+
+  steps:
+    - id: extract-application-documents
+      capability: extract-application-documents
+      archetype: extract
+      rclass: R0
+      accountable_role: Lending Operations
+      route: document-extraction
+
+    - id: verify-identity
+      capability: verify-identity
+      archetype: check
+      rclass: R0
+      accountable_role: KYC Operations
+      route: identity-verification
+
+    - id: verify-business
+      capability: verify-business
+      archetype: check
+      rclass: R0
+      accountable_role: KYC Operations
+      route: business-verification
+
+    - id: calculate-trust-score
+      capability: calculate-trust-score
+      archetype: check
+      rclass: R0
+      accountable_role: Credit Risk
+      route: trust-scoring
+
+    - id: human-exception-review
+      capability: human-credit-review
+      archetype: human_task
+      rclass: R0
+      accountable_role: Credit Risk
+      route: credit-review
+
+    - id: prepare-credit-decision
+      capability: prepare-credit-decision
+      archetype: generate
+      rclass: R1
+      accountable_role: Credit Risk
+      route: credit-decision-draft
+
+  authority:
+    autonomous_max_rclass: R1
+    approval_required_for: [R2, R3, R4]
+    high_stakes_disclosure_requires_second_approver: true
+
+  context:
+    owned_by: institution
+    source_of_truth:
+      - process_definition
+      - capability_contracts
+      - routes
+      - test_sets
+      - thresholds
+      - exception_outcomes
+      - decision_log
+    supplier_lease_policy: declared-fields-only
+
+  test_set:
+    id: sme-credit-origination-regression-v1
+    cases:
+      - id: clean-sme
+        expected: pass
+      - id: name-mismatch
+        expected: refer
+      - id: sanctions-hit
+        expected: fail
+      - id: low-confidence-document
+        expected: refer
+      - id: missing-registration
+        expected: refer
+
+  swap_drill:
+    first_target_capability: extract-application-documents
+    mode: shadow
+    promotion_requires:
+      - contract_conformance
+      - regression_pass
+      - no_material_exception_regression
+      - context_lease_equivalence
+      - authority_policy_equivalence
+    north_star_metric: proven_time_to_swap

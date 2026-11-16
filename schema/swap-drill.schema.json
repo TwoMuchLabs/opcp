@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opcp:schema:0.3:swap-drill",
+  "title": "OPCP supplier swap-drill result",
+  "description": "Machine-readable evidence that a candidate supplier was evaluated against an incumbent without changing the owned process, context lease or authority policy.",
+  "type": "object",
+  "required": [
+    "opcp_version",
+    "id",
+    "capability",
+    "incumbent_supplier",
+    "candidate_supplier",
+    "execution",
+    "invariants",
+    "promotion_gates",
+    "regression",
+    "time_to_swap",
+    "started_at",
+    "completed_at",
+    "decision"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "opcp_version": {"const": "0.3"},
+    "id": {"type": "string", "minLength": 1},
+    "capability": {"type": "string", "minLength": 1},
+    "incumbent_supplier": {"type": "string", "minLength": 1},
+    "candidate_supplier": {"type": "string", "minLength": 1},
+    "execution": {
+      "type": "object",
+      "required": ["mode", "customer_visible", "authority_effects_applied"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["shadow", "rehearsal", "production"]},
+        "customer_visible": {"type": "boolean"},
+        "authority_effects_applied": {"type": "boolean"}
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "required": ["process", "context_lease", "authority_policy"],
+      "additionalProperties": false,
+      "properties": {
+        "process": {"$ref": "#/$defs/invariant"},
+        "context_lease": {"$ref": "#/$defs/invariant"},
+        "authority_policy": {"$ref": "#/$defs/invariant"}
+      }
+    },
+    "promotion_gates": {
+      "type": "object",
+      "required": [
+        "process_unchanged",
+        "context_lease_unchanged",
+        "authority_policy_unchanged",
+        "contract_conformance",
+        "regression_pass",
+        "material_exception_regression"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "process_unchanged": {"type": "boolean"},
+        "context_lease_unchanged": {"type": "boolean"},
+        "authority_policy_unchanged": {"type": "boolean"},
+        "contract_conformance": {"type": "boolean"},
+        "regression_pass": {"type": "boolean"},
+        "material_exception_regression": {"type": "boolean"}
+      }
+    },
+    "regression": {
+      "type": "object",
+      "required": ["total_cases", "passed_cases", "failed_cases", "cases"],
+      "additionalProperties": false,
+      "properties": {
+        "total_cases": {"type": "integer", "minimum": 0},
+        "passed_cases": {"type": "integer", "minimum": 0},
+        "failed_cases": {"type": "integer", "minimum": 0},
+        "cases": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/case"}
+        }
+      }
+    },
+    "time_to_swap": {
+      "type": "object",
+      "required": ["contracting_days", "onboarding_days", "technical_cutover_days", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "contracting_days": {"type": "number", "minimum": 0},
+        "onboarding_days": {"type": "number", "minimum": 0},
+        "technical_cutover_days": {"type": "number", "minimum": 0},
+        "confidence": {"enum": ["estimated", "proven"]},
+        "drill_date": {"type": "string", "format": "date"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"confidence": {"const": "proven"}}},
+          "then": {"required": ["drill_date"]}
+        }
+      ]
+    },
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "decision": {"enum": ["passed", "failed"]},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "reference"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {"type": "string", "minLength": 1},
+          "reference": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "invariant": {
+      "type": "object",
+      "required": ["incumbent_revision", "candidate_revision", "unchanged"],
+      "additionalProperties": false,
+      "properties": {
+        "incumbent_revision": {"type": "string", "minLength": 1},
+        "candidate_revision": {"type": "string", "minLength": 1},
+        "unchanged": {"type": "boolean"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "required": ["case_id", "expected", "incumbent", "candidate", "passed"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "expected": {"type": "string"},
+        "incumbent": {"type": "string"},
+        "candidate": {"type": "string"},
+        "incumbent_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "candidate_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "passed": {"type": "boolean"}
+      }
+    }
+  }
+}
