@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.2 (draft) — 2026-11-16
 
-Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, and idempotency that survives a restart.
+Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, idempotency that survives a restart, and BIAN v14 mappings for the catalogue.
 
 - **Security fix: the context lease withholds undeclared fields inside arrays** (#54). An array with no `items` schema, with only `prefixItems`, or with only `contains` passed its elements whole, so undeclared nested fields reached the supplier (spec 11.2). Elements are now pruned against `prefixItems` by position, then `items`; an array without an item schema declares no fields inside its elements; boolean schemas declare none either.
 - **Security fix: two-person approval needs two different people, and every approval a name** (#55). "alice" and "Alice" (or "alice ") counted as two approvers, and an approval with a blank or invisible approver name was accepted. Identities are compared after Unicode normalisation, case folding, whitespace collapsing and removal of invisible characters; an approval that names no approver is declined.
@@ -19,6 +19,8 @@ Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, har
 
 - `evaluate_swap()` now requires the six revision arguments (`process_incumbent_revision` and the rest); a missing or blank one raises `ValueError`.
 - An approval callback that returned an empty or whitespace `by` is now declined, and approver names are recorded trimmed.
+- A contract whose input has an array without an `items` schema now leases its object elements without their fields. Declare `items` for any array the supplier needs to see inside.
+- An assessment or answers file with a proven time-to-swap dated after the assessment is refused.
 
 ## 0.3.1 (draft) — 2026-11-16
 
