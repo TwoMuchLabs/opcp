@@ -1,8 +1,10 @@
-"""Summarise a shadow drill from the event log (spec 9.5).
+"""Summarise a shadow drill from the event log (spec 9.6).
 
 A shadow route copies live requests to an alternative supplier and records how its output compares.
-This module turns those ``shadow`` entries into the figures a swap drill needs: how often the
-alternative agreed with the live supplier, field by field, how often it failed, and what it cost.
+This module turns those ``shadow`` entries into figures for a swap drill: how often the alternative
+agreed with the live supplier, field by field, how often it failed, and what it cost. Agreement is not
+regression evidence by itself; the drill record (SWAP-DRILL section 5) judges both suppliers against the
+business's expected outcomes.
 """
 
 from __future__ import annotations
@@ -94,7 +96,7 @@ def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
 
 def render_text(summaries: list[ShadowSummary]) -> str:
     if not summaries:
-        return "No shadow entries found. Add a `shadow` block to a route (spec 9.5) and run traffic through it.\n"
+        return "No shadow entries found. Add a `shadow` block to a route (spec 9.6) and run traffic through it.\n"
     lines: list[str] = []
     for s in summaries:
         d = s.to_dict()
@@ -109,7 +111,9 @@ def render_text(summaries: list[ShadowSummary]) -> str:
         for reason, n in sorted(s.skipped.items()):
             lines.append(f"  skipped {n}: {reason}")
         lines.append("")
-    lines.append("Record the drill in the answers file: ERS-EXT-03 (cutover days), ERS-EXT-04 (drill date) and "
-                 "ERS-DEP-02 (the alternative supplier), with evidence 'tested'. See docs/SWAP-DRILL.md.")
+    lines.append("Agreement with the live supplier is not regression evidence on its own: a swap drill judges the "
+                 "candidate against the business's own expected outcomes (SWAP-DRILL section 5), and the live "
+                 "supplier can be wrong. Use these figures as input to a drill record and check it with "
+                 "`opcp swap-drill`. See docs/SWAP-DRILL.md.")
     return "\n".join(lines) + "\n"
 

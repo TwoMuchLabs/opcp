@@ -43,7 +43,7 @@
     "concentration_exception": {"type": "string", "description": "Reference to an approved exception, if this route breaches the concentration limit."},
     "shadow": {
       "type": "object",
-      "description": "Send copies of requests to an alternative supplier and compare its output with the live result, without acting on it (spec 9.5). Runs only when the authority gate applies R0 and the shadow supplier passes every eligibility filter.",
+      "description": "Send copies of requests to an alternative supplier and compare its output with the live result, without acting on it (spec 9.6). Runs only when the authority gate applies R0 and the shadow supplier passes every eligibility filter.",
       "required": ["adapter"],
       "additionalProperties": false,
       "properties": {

@@ -20,7 +20,7 @@ MODES = ("pinned", "segmented", "cascade", "weighted", "best_score")
 
 @dataclass(frozen=True)
 class ShadowSpec:
-    """Send copies of requests to an alternative supplier and compare, without acting on its result (spec 9.5)."""
+    """Send copies of requests to an alternative supplier and compare, without acting on its result (spec 9.6)."""
 
     adapter: str
     sample: float = 1.0

@@ -1,7 +1,9 @@
-"""Shadow routing for swap drills (spec 9.5)."""
+"""Shadow routing for swap drills (spec 9.6)."""
 
 import datetime as dt
 import json
+import threading
+import time
 
 import pytest
 
@@ -64,8 +66,10 @@ def setup(shadow_adapter, shadow=None, gate=None, **kw):
     return plane, live, log
 
 
-def shadow_entries(log):
-    return [e for e in log if e["kind"] == "shadow"]
+def shadow_entries(plane):
+    """Shadow calls run in the background: wait for them, then read what they recorded."""
+    assert plane.wait_for_shadows(timeout=10)
+    return [e for e in plane.log if e["kind"] == "shadow"]
 
 
 def test_shadow_copies_the_leased_request_and_records_agreement():
@@ -74,7 +78,7 @@ def test_shadow_copies_the_leased_request_and_records_agreement():
     resp = plane.call("verify-identity", PERSON, idempotency_key="k1", **CALL)
     assert resp.status == "ok" and resp.supplier_id == "LIVE"
     assert alt.seen and "marketing_notes" not in alt.seen[0]  # only the leased fields leave
-    (entry,) = shadow_entries(log)
+    (entry,) = shadow_entries(plane)
     assert entry["outcome"] == "ok" and entry["disagreed"] == []
     assert set(entry["agreed"]) >= {"verdict", "reason_codes"}
     assert "differences" not in entry  # values stay out of the log by default
@@ -85,7 +89,7 @@ def test_disagreement_is_recorded_and_never_changes_the_live_result():
     plane, _, log = setup(alt, store_values=True)
     resp = plane.call("verify-identity", PERSON, idempotency_key="k2", **CALL)
     assert resp.output["verdict"] == "pass"
-    (entry,) = shadow_entries(log)
+    (entry,) = shadow_entries(plane)
     assert entry["disagreed"] == ["verdict"] or "verdict" in entry["disagreed"]
     assert entry["differences"]["verdict"] == {"live": "pass", "shadow": "refer"}
 
@@ -95,7 +99,7 @@ def test_shadow_failures_are_recorded_and_the_live_call_succeeds(kw, outcome):
     alt = Check(profile("alt"), **kw)
     plane, _, log = setup(alt)
     assert plane.call("verify-identity", PERSON, idempotency_key="k3", **CALL).status == "ok"
-    assert shadow_entries(log)[0]["outcome"] == outcome
+    assert shadow_entries(plane)[0]["outcome"] == outcome
 
 
 @pytest.mark.parametrize("kw, words", [
@@ -108,7 +112,7 @@ def test_ineligible_shadow_supplier_never_receives_data(kw, words):
     plane, _, log = setup(alt)
     plane.call("verify-identity", PERSON, idempotency_key="k4", residency=["SG"], **CALL)
     assert alt.seen == []
-    (entry,) = shadow_entries(log)
+    (entry,) = shadow_entries(plane)
     assert entry["outcome"] == "skipped" and words in entry["reason"]
 
 
@@ -120,7 +124,7 @@ def test_shadow_never_runs_above_r0():
     plane = ControlPlane(CATALOGUE, [live, alt], [route({"adapter": "alt"})], gate=gate, log=log, today=TODAY)
     assert plane.call("verify-identity", PERSON, idempotency_key="k5", **CALL).status == "ok"
     assert alt.seen == []
-    assert "only for R0" in shadow_entries(log)[0]["reason"]
+    assert "only for R0" in shadow_entries(plane)[0]["reason"]
 
 
 def test_replay_does_not_run_the_shadow_again():
@@ -128,7 +132,7 @@ def test_replay_does_not_run_the_shadow_again():
     plane, _, log = setup(alt)
     plane.call("verify-identity", PERSON, idempotency_key="k6", **CALL)
     plane.call("verify-identity", PERSON, idempotency_key="k6", **CALL)
-    assert len(alt.seen) == 1 and len(shadow_entries(log)) == 1
+    assert len(alt.seen) == 1 and len(shadow_entries(plane)) == 1
 
 
 def test_sampling_is_deterministic_and_partial():
@@ -142,7 +146,7 @@ def test_compare_limits_the_fields_checked():
     alt = Check(profile("alt"), verdict="refer")
     plane, _, log = setup(alt, shadow={"adapter": "alt", "compare": ["reason_codes"]})
     plane.call("verify-identity", PERSON, idempotency_key="k7", **CALL)
-    entry = shadow_entries(log)[0]
+    entry = shadow_entries(plane)[0]
     assert entry["agreed"] == ["reason_codes"] and entry["disagreed"] == []
 
 
@@ -161,9 +165,11 @@ def test_drill_summary_and_cli(tmp_path, capsys):
     for i in range(4):
         person = {**PERSON, "document": {**PERSON["document"], "number": f"K{i:07d}"}}
         plane.call("verify-identity", person, idempotency_key=f"d{i}", **CALL)
+    assert plane.wait_for_shadows(timeout=10)
     agree.verdict = "refer"
     agree._results.clear()
     plane.call("verify-identity", {**PERSON, "full_name": "Sam Lee"}, idempotency_key="d9", **CALL)
+    assert plane.wait_for_shadows(timeout=10)
     (s,) = summarise(log)
     assert (s.compared, s.full_agreement) == (5, 4)
     assert s.to_dict()["field_agreement"]["verdict"] == pytest.approx(0.8)
@@ -182,3 +188,93 @@ def test_an_empty_event_log_passed_in_is_the_one_used():
     log = EventLog()
     plane = ControlPlane(CATALOGUE, [Check(profile("live"))], [route(None)], log=log, today=TODAY)
     assert plane.log is log
+
+
+# ---------------------------------------------------------------- review of 7 Nov: timing, isolation, lease
+
+
+class Slow(Check):
+    def __init__(self, profile, delay, **kw):
+        super().__init__(profile, **kw)
+        self.delay = delay
+
+    def invoke(self, payload, request):
+        time.sleep(self.delay)
+        return super().invoke(payload, request)
+
+
+def test_a_slow_shadow_adds_nothing_to_the_live_call():
+    alt = Slow(profile("alt"), delay=1.0)
+    plane, _, _ = setup(alt)
+    started = time.perf_counter()
+    resp = plane.call("verify-identity", PERSON, idempotency_key="t1", **CALL)
+    elapsed = time.perf_counter() - started
+    assert resp.status == "ok" and elapsed < 0.5, elapsed  # before: +1.0 s, the shadow ran inline
+    (entry,) = shadow_entries(plane)
+    assert entry["outcome"] == "ok" and entry["latency_ms"] >= 900
+
+
+def test_a_shadow_whose_forget_raises_cannot_fail_the_live_call():
+    class BadForget(Check):
+        def forget(self, payload, request):
+            raise RuntimeError("cache unavailable")
+
+    alt = BadForget(profile("alt"), bad=True)
+    plane, _, _ = setup(alt)
+    assert plane.call("verify-identity", PERSON, idempotency_key="t2", **CALL).status == "ok"
+    outcomes = [e["outcome"] for e in shadow_entries(plane)]
+    assert outcomes[0] == "invalid"  # recorded before forget() ran
+
+
+def test_a_shadow_that_breaks_the_comparison_is_recorded_not_raised():
+    class Explodes(dict):
+        def get(self, *args):  # anything reading the output fails
+            raise RuntimeError("unreadable output")
+
+    class Odd(Check):
+        def invoke(self, payload, request):
+            result = super().invoke(payload, request)
+            result.output = Explodes(result.output)
+            return result
+
+    alt = Odd(profile("alt"))
+    plane, _, _ = setup(alt)
+    assert plane.call("verify-identity", PERSON, idempotency_key="t3", **CALL).status == "ok"
+    (entry,) = shadow_entries(plane)
+    assert entry["outcome"] == "error" and entry["detail"] == "RuntimeError"
+
+
+def test_the_shadow_entry_records_lent_and_withheld_fields():
+    alt = Check(profile("alt"))
+    plane, _, _ = setup(alt)
+    plane.call("verify-identity", PERSON, idempotency_key="t4", **CALL)
+    (entry,) = shadow_entries(plane)
+    assert entry["withheld_fields"] == ["marketing_notes"]
+    assert set(entry["leased_fields"]) == {"full_name", "date_of_birth", "document"}
+
+
+def test_the_caller_changing_its_objects_cannot_change_what_the_shadow_receives():
+    gate = threading.Event()
+
+    class Waits(Check):
+        def invoke(self, payload, request):
+            gate.wait(5)
+            return super().invoke(payload, request)
+
+    alt = Waits(profile("alt"))
+    plane, _, _ = setup(alt)
+    person = json.loads(json.dumps(PERSON))
+    resp = plane.call("verify-identity", person, idempotency_key="t5", **CALL)
+    person["full_name"] = "Changed After Return"
+    resp.output["verdict"] = "fail"
+    gate.set()
+    (entry,) = shadow_entries(plane)
+    assert alt.seen[0]["full_name"] == "Alex Tan" and entry["disagreed"] == []
+
+
+def test_close_waits_for_outstanding_shadows():
+    alt = Slow(profile("alt"), delay=0.2)
+    plane, _, log = setup(alt)
+    plane.call("verify-identity", PERSON, idempotency_key="t6", **CALL)
+    plane.close()
+    assert [e["outcome"] for e in log if e["kind"] == "shadow"] == ["ok"]
