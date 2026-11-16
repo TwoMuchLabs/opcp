@@ -1,7 +1,16 @@
-# Keeps the pinned action SHAs in the workflows current: a weekly pull request when an action releases.
+# Keeps the pinned action SHAs in the workflows current.
+# Minor and patch releases arrive as one grouped pull request a week. Major versions are left to a
+# person, because they can change behaviour (runtime, defaults, artifact handling) in ways that CI on a
+# pull request does not exercise: the release workflow only runs at release time.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
