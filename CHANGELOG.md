@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, and idempotency that survives a restart.
+- **Shadow calls** (spec section 9.6, `opcp shadow-report`). A route can name a shadow supplier that receives copies of selected R0 requests, after it passes every eligibility filter and only with the leased input. Its output is compared field by field with the live result and recorded, with the fields lent and withheld; it is never returned or acted on. Shadow calls run on background workers, so the live caller never waits for them, and nothing a shadow supplier does or raises can reach the live call. `ControlPlane.wait_for_shadows()` and `close()` let a deployment finish them before exporting the log. Waiting shadow calls are capped (`shadow_queue_limit`, default 100); beyond that, requests are not copied and the skip is logged. `opcp shadow-report` summarises agreement as input to a swap-drill record, not as regression evidence.
+
+## 0.3.2 (draft) — 2026-11-16
+
+Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, idempotency that survives a restart, and BIAN v14 mappings for the catalogue.
 
 - **Security fix: the context lease withholds undeclared fields inside arrays** (#54). An array with no `items` schema, with only `prefixItems`, or with only `contains` passed its elements whole, so undeclared nested fields reached the supplier (spec 11.2). Elements are now pruned against `prefixItems` by position, then `items`; an array without an item schema declares no fields inside its elements; boolean schemas declare none either.
 - **Security fix: two-person approval needs two different people, and every approval a name** (#55). "alice" and "Alice" (or "alice ") counted as two approvers, and an approval with a blank or invisible approver name was accepted. Identities are compared after Unicode normalisation, case folding, whitespace collapsing and removal of invisible characters; an approval that names no approver is declined.
@@ -12,12 +16,18 @@ Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, har
 - **Idempotency records that survive a restart or a crash** (#60). `opcp.idempotency.FileIdempotencyStore` keeps completed responses and unresolved outcomes in a file synced to disk, read back on start, with a `retention` window for completed records. Before calling a supplier of an effectful capability, the control plane records that it may be about to act, so a crash mid-call cannot lead to a second posting at another supplier after a restart. `ControlPlane(idempotency_store=...)`; the default stays in memory. See `docs/ARCHITECTURE.md`.
 - **Hardening: generated pages block network requests** (#58). The offline form, report and readout declare a Content Security Policy: no network access, and no scripts at all in reports. YAML documents that expand past one million values through aliases are refused.
 - **CI** (#59). Actions are pinned to commit SHAs, including the PyPI publish step; Dependabot keeps them current; the offline form's browser test runs in CI.
-- **Shadow calls** (spec section 9.6, `opcp shadow-report`). A route can name a shadow supplier that receives copies of selected R0 requests, after it passes every eligibility filter and only with the leased input. Its output is compared field by field with the live result and recorded, with the fields lent and withheld; it is never returned or acted on. Shadow calls run on background workers, so the live caller never waits for them, and nothing a shadow supplier does or raises can reach the live call. `ControlPlane.wait_for_shadows()` and `close()` let a deployment finish them before exporting the log. Waiting shadow calls are capped (`shadow_queue_limit`, default 100); beyond that, requests are not copied and the skip is logged. `opcp shadow-report` summarises agreement as input to a swap-drill record, not as regression evidence.
+<<<<<<< ours
+=======
+- **Industry taxonomy mappings** (#2, `docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
+- The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
+>>>>>>> theirs
 
 ### Changes you may need to make
 
 - `evaluate_swap()` now requires the six revision arguments (`process_incumbent_revision` and the rest); a missing or blank one raises `ValueError`.
 - An approval callback that returned an empty or whitespace `by` is now declined, and approver names are recorded trimmed.
+- A contract whose input has an array without an `items` schema now leases its object elements without their fields. Declare `items` for any array the supplier needs to see inside.
+- An assessment or answers file with a proven time-to-swap dated after the assessment is refused.
 
 ## 0.3.1 (draft) — 2026-11-16
 
