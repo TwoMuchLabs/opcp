@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, and idempotency that survives a restart.
+
+- **Security fix: the context lease withholds undeclared fields inside arrays** (#54). An array with no `items` schema, with only `prefixItems`, or with only `contains` passed its elements whole, so undeclared nested fields reached the supplier (spec 11.2). Elements are now pruned against `prefixItems` by position, then `items`; an array without an item schema declares no fields inside its elements; boolean schemas declare none either.
+- **Security fix: two-person approval needs two different people, and every approval a name** (#55). "alice" and "Alice" (or "alice ") counted as two approvers, and an approval with a blank or invisible approver name was accepted. Identities are compared after Unicode normalisation, case folding, whitespace collapsing and removal of invisible characters; an approval that names no approver is declined.
+- **Fix: a proven time-to-swap needs a drill dated on or before the assessment** (#57). A drill dated in the future counted as proven (spec 12.3).
+- **Fix: a swap drill must name the revisions it compared** (#63). `evaluate_swap()` defaulted every revision to a placeholder such as `process:current`, so the "unchanged" invariants held without anything being compared (SWAP-DRILL section 3).
+- **Conformance: RT-21 and `check_runtime` catch a runtime without its own idempotency** (#56). Their test suppliers deduplicated repeats themselves, so a runtime that stored nothing passed.
+- **Idempotency records that survive a restart or a crash** (#60). `opcp.idempotency.FileIdempotencyStore` keeps completed responses and unresolved outcomes in a file synced to disk, read back on start, with a `retention` window for completed records. Before calling a supplier of an effectful capability, the control plane records that it may be about to act, so a crash mid-call cannot lead to a second posting at another supplier after a restart. `ControlPlane(idempotency_store=...)`; the default stays in memory. See `docs/ARCHITECTURE.md`.
+- **Hardening: generated pages block network requests** (#58). The offline form, report and readout declare a Content Security Policy: no network access, and no scripts at all in reports. YAML documents that expand past one million values through aliases are refused.
+- **CI** (#59). Actions are pinned to commit SHAs, including the PyPI publish step; Dependabot keeps them current; the offline form's browser test runs in CI.
+
+### Changes you may need to make
+
+- `evaluate_swap()` now requires the six revision arguments (`process_incumbent_revision` and the rest); a missing or blank one raises `ValueError`.
+- An approval callback that returned an empty or whitespace `by` is now declined, and approver names are recorded trimmed.
+
 ## 0.3.1 (draft) — 2026-11-16
 
 Two critical fixes: the runtime could perform a payment or posting twice, and the swap-drill evaluator could pass a drill whose authority policy had changed. Everyone on 0.3.0 should upgrade.
