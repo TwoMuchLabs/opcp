@@ -1,0 +1,72 @@
+{
+  "id": "RT-01-gate-before-supplier",
+  "guarantee": "An R4 capability with no approver is refused by the gate before any supplier is invoked, and the refusal is recorded (spec 10, 10.4, 10.6, 13).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "send-customer-notification"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "n",
+        "supplier_id": "N",
+        "capability": "send-customer-notification",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "message_id": "m-1",
+              "delivery_status": "queued"
+            },
+            "evidence": [
+              {
+                "type": "provider-receipt",
+                "reference": "m-1"
+              }
+            ]
+          }
+        },
+        "max_rclass": "R4",
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "send-customer-notification",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "n"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "send-customer-notification",
+      "input": {
+        "recipient_ref": "CUST-1",
+        "channel": "email",
+        "template_id": "t-1"
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "rejected",
+        "supplier": null,
+        "rclass": "R4",
+        "gate_decision": {
+          "allowed": false,
+          "rclass": "R4"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "n": 0
+    }
+  }
+}

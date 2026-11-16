@@ -1,0 +1,124 @@
+{
+  "id": "RT-04-r4-second-approver",
+  "guarantee": "With two-person R4 approval, one approver is not enough and the same person twice is not two; two different approvers are (spec 10.4).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "send-customer-notification"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "n",
+        "supplier_id": "N",
+        "capability": "send-customer-notification",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "message_id": "m-1",
+              "delivery_status": "queued"
+            },
+            "evidence": [
+              {
+                "type": "provider-receipt",
+                "reference": "m-1"
+              }
+            ]
+          }
+        },
+        "max_rclass": "R4",
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "send-customer-notification",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "n"
+        ]
+      }
+    ],
+    "gate": {
+      "two_person_r4": true,
+      "approvals": [
+        {
+          "approved": true,
+          "by": "alice"
+        },
+        {
+          "approved": true,
+          "by": "alice",
+          "second_by": "alice"
+        },
+        {
+          "approved": true,
+          "by": "alice",
+          "second_by": "bob"
+        }
+      ]
+    }
+  },
+  "calls": [
+    {
+      "capability": "send-customer-notification",
+      "input": {
+        "recipient_ref": "CUST-1",
+        "channel": "email",
+        "template_id": "t-1"
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "rejected",
+        "gate_decision": {
+          "allowed": false,
+          "rclass": "R4"
+        }
+      }
+    },
+    {
+      "capability": "send-customer-notification",
+      "input": {
+        "recipient_ref": "CUST-1",
+        "channel": "email",
+        "template_id": "t-1"
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k2",
+      "expect": {
+        "status": "rejected",
+        "gate_decision": {
+          "allowed": false,
+          "rclass": "R4"
+        }
+      }
+    },
+    {
+      "capability": "send-customer-notification",
+      "input": {
+        "recipient_ref": "CUST-1",
+        "channel": "email",
+        "template_id": "t-1"
+      },
+      "data_classification": "internal",
+      "idempotency_key": "k3",
+      "expect": {
+        "status": "ok",
+        "supplier": "N",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R4"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "n": 1
+    }
+  }
+}

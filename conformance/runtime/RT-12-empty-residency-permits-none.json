@@ -1,0 +1,75 @@
+{
+  "id": "RT-12-empty-residency-permits-none",
+  "guarantee": "A supplier failing one eligibility filter is excluded, however good it is otherwise, and the call fails without invoking it (spec 9.1(5) and 7.1: an empty residency list permits no region).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "verify-identity",
+      "input": {
+        "full_name": "Alex Tan",
+        "date_of_birth": "1990-04-12",
+        "document": {
+          "type": "passport",
+          "number": "K1234567",
+          "issuing_country": "SG"
+        }
+      },
+      "data_classification": "confidential",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "failed",
+        "supplier": null,
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      },
+      "residency": []
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 0
+    }
+  }
+}

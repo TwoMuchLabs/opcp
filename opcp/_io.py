@@ -32,16 +32,43 @@ def load_document(path: str | Path) -> Any:
     return yaml.load(text, Loader=_StringDateLoader)  # noqa: S506 - safe loader subclass
 
 
+# JSON Schema 2020-12 treats "format" as an annotation unless a validator chooses to assert it, and
+# python-jsonschema asserts some formats only when optional packages happen to be installed. Without
+# a fixed list, "date" was checked everywhere but "date-time" and "uri" only on machines that had
+# those packages, so the same document could pass on one machine and fail on another. These formats
+# are always asserted (their checkers ship with jsonschema or with the two validators OPCP depends
+# on); any other format is an annotation only, everywhere. The checkers are taken from the draft
+# 2020-12 set: jsonschema's global FormatChecker registry maps "time" to the draft-3 checker
+# (HH:MM:SS, no offset). A listed checker that is unavailable raises KeyError at import, so a missing
+# dependency cannot silently weaken validation.
+ENFORCED_FORMATS = ("date", "date-time", "time", "uri", "uri-reference", "email", "ipv4", "ipv6", "uuid", "regex")
+
+
+def _format_checker() -> FormatChecker:
+    available = Draft202012Validator.FORMAT_CHECKER.checkers
+    missing = [name for name in ENFORCED_FORMATS if name not in available]
+    if missing:
+        raise ImportError(f"jsonschema cannot check the {', '.join(missing)} format(s); install OPCP's dependencies "
+                          "(rfc3339-validator, rfc3986-validator), for example with `pip install opcp`")
+    checker = FormatChecker(formats=())
+    for name in ENFORCED_FORMATS:
+        checker.checkers[name] = available[name]
+    return checker
+
+
+FORMAT_CHECKER = _format_checker()
+
+
 @lru_cache(maxsize=None)
 def schema_validator(name: str) -> Draft202012Validator:
     """Validator for a bundled schema, e.g. ``capability``, ``route``, ``scorecard``."""
     schema = json.loads((data_dir("schema") / f"{name}.schema.json").read_text(encoding="utf-8"))
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    return Draft202012Validator(schema, format_checker=FORMAT_CHECKER)
 
 
 def validator_for(schema: dict) -> Draft202012Validator:
     """Validator for an ad hoc schema, such as a contract's input or output."""
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    return Draft202012Validator(schema, format_checker=FORMAT_CHECKER)
 
 
 def errors(validator: Draft202012Validator, document: Any, *, redact: bool = False) -> list[str]:

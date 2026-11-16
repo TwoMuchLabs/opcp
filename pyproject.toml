@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Open Process Control Plane: own your processes, context and authority; rent capabilities from any vendor"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,7 +17,9 @@ classifiers = [
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
 ]
-dependencies = ["pyyaml>=6", "jsonschema>=4.18"]
+# rfc3339-validator and rfc3986-validator (both MIT) let jsonschema check the date-time, time, uri
+# and uri-reference formats; see ENFORCED_FORMATS in opcp/_io.py.
+dependencies = ["pyyaml>=6", "jsonschema>=4.18", "rfc3339-validator>=0.1.4", "rfc3986-validator>=0.1.1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

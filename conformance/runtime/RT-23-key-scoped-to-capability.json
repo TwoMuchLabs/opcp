@@ -1,0 +1,145 @@
+{
+  "id": "RT-23-key-scoped-to-capability",
+  "guarantee": "An idempotency key is scoped to the capability: the same key on two capabilities is two calls (spec 7.1).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity",
+      "post-journal-entry"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      },
+      {
+        "adapter_id": "l",
+        "supplier_id": "L",
+        "capability": "post-journal-entry",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "receipt_id": "rcpt-1",
+              "status": "completed",
+              "compensation": "post a reversing entry"
+            },
+            "evidence": [
+              {
+                "type": "ledger",
+                "reference": "gl-1"
+              }
+            ]
+          }
+        },
+        "max_rclass": "R2",
+        "max_data_classification": "internal"
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a"
+        ]
+      },
+      {
+        "opcp_version": "0.1",
+        "capability": "post-journal-entry",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "l"
+        ]
+      }
+    ],
+    "gate": {
+      "budgets": {
+        "post-journal-entry": 1
+      }
+    }
+  },
+  "calls": [
+    {
+      "capability": "verify-identity",
+      "input": {
+        "full_name": "Alex Tan",
+        "date_of_birth": "1990-04-12",
+        "document": {
+          "type": "passport",
+          "number": "K1234567",
+          "issuing_country": "SG"
+        }
+      },
+      "data_classification": "confidential",
+      "idempotency_key": "same",
+      "expect": {
+        "status": "ok",
+        "supplier": "A",
+        "rclass": "R0",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      }
+    },
+    {
+      "capability": "post-journal-entry",
+      "input": {
+        "entry_date": "2026-10-31",
+        "currency": "SGD",
+        "lines": [
+          {
+            "account": "6100",
+            "debit": 10,
+            "credit": 0
+          },
+          {
+            "account": "2100",
+            "debit": 0,
+            "credit": 10
+          }
+        ]
+      },
+      "data_classification": "internal",
+      "idempotency_key": "same",
+      "expect": {
+        "status": "ok",
+        "supplier": "L",
+        "rclass": "R2",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R2"
+        }
+      }
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 1,
+      "l": 1
+    }
+  }
+}

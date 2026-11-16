@@ -48,6 +48,8 @@ An answer is **Declared** when someone says so, **Documented** when it points to
 
 ## Readout agenda (60 minutes)
 
+Prepare the pack with `opcp scorecard readout answers.json -o readout.html`, and print it to PDF. It puts these on two pages: where each process stands, the decisions for the sponsor, and each contract's last day to give notice.
+
 1. **The portfolio view (10 minutes).** How many processes are locked, partial or ready, and which supplier is primary for how many of them.
 2. **The weakest link (15 minutes).** The worst-rated process: which measure caused the rating, and what the report recommends.
 3. **The drill (15 minutes).** What was rehearsed, the measured days against the estimate, and what surprised people.

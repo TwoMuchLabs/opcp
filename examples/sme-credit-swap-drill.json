@@ -1,0 +1,57 @@
+{
+  "opcp_version": "0.3",
+  "id": "swap-sme-credit-documents-2026-10-30",
+  "capability": "extract-application-documents",
+  "incumbent_supplier": "supplier-a",
+  "candidate_supplier": "supplier-b",
+  "execution": {
+    "mode": "shadow",
+    "customer_visible": false,
+    "authority_effects_applied": false
+  },
+  "invariants": {
+    "process": {
+      "incumbent_revision": "sme-credit-origination:1.0",
+      "candidate_revision": "sme-credit-origination:1.0",
+      "unchanged": true
+    },
+    "context_lease": {
+      "incumbent_revision": "extract-application-documents:lease-1",
+      "candidate_revision": "extract-application-documents:lease-1",
+      "unchanged": true
+    },
+    "authority_policy": {
+      "incumbent_revision": "sme-credit-authority:4",
+      "candidate_revision": "sme-credit-authority:4",
+      "unchanged": true
+    }
+  },
+  "promotion_gates": {
+    "process_unchanged": true,
+    "context_lease_unchanged": true,
+    "authority_policy_unchanged": true,
+    "contract_conformance": true,
+    "regression_pass": true,
+    "material_exception_regression": true
+  },
+  "regression": {
+    "total_cases": 4,
+    "passed_cases": 4,
+    "failed_cases": 0,
+    "cases": [
+      {"case_id": "clean-sme", "expected": "pass", "incumbent": "pass", "candidate": "pass", "incumbent_confidence": 0.98, "candidate_confidence": 0.97, "passed": true},
+      {"case_id": "name-mismatch", "expected": "refer", "incumbent": "refer", "candidate": "refer", "incumbent_confidence": 0.91, "candidate_confidence": 0.90, "passed": true},
+      {"case_id": "sanctions-hit", "expected": "fail", "incumbent": "fail", "candidate": "fail", "incumbent_confidence": 0.99, "candidate_confidence": 0.99, "passed": true},
+      {"case_id": "low-confidence-document", "expected": "refer", "incumbent": "refer", "candidate": "refer", "incumbent_confidence": 0.62, "candidate_confidence": 0.65, "passed": true}
+    ]
+  },
+  "time_to_swap": {
+    "contracting_days": 0,
+    "onboarding_days": 0,
+    "technical_cutover_days": 2.5,
+    "confidence": "estimated"
+  },
+  "started_at": "2026-10-30T00:00:00+00:00",
+  "completed_at": "2026-10-30T00:00:01+00:00",
+  "decision": "passed"
+}

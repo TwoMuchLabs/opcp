@@ -1,0 +1,8 @@
+# A route: which supplier fulfils the capability, and how (spec section 9).
+opcp_version: "0.1"
+capability: screen-name
+version: 1
+mode: pinned                # primary first, then fallbacks in order
+authored_by: ops.architect  # maker...
+approved_by: risk.officer   # ...and a different checker
+candidates: [watchlist-inhouse]

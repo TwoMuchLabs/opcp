@@ -1,0 +1,24 @@
+# A capability contract: what the business needs done, independent of who does it (spec section 6).
+opcp_version: "0.1"
+id: screen-name
+version: 1.0.0
+name: Screen a name against a watch list
+archetype: check            # check: entity in, verdict out (spec section 5)
+description: Checks a person's name against a watch list and returns pass, fail or refer.
+rclass: R0                  # reads and returns a verdict; no effect on the world
+data_classification: confidential
+input:
+  type: object
+  required: [full_name]
+  properties:               # only these fields are ever lent to a supplier (the context lease)
+    full_name: {type: string}
+    country: {type: string, pattern: "^[A-Z]{2}$"}
+output:
+  type: object
+  required: [verdict, reason_codes]
+  properties:
+    verdict: {enum: [pass, fail, refer]}
+    reason_codes: {type: array, items: {type: string}}
+examples:
+  - name: Clear name
+    input: {full_name: Alex Tan, country: SG}

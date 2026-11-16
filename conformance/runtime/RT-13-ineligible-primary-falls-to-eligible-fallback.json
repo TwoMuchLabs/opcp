@@ -1,0 +1,103 @@
+{
+  "id": "RT-13-ineligible-primary-falls-to-eligible-fallback",
+  "guarantee": "Eligibility runs before selection: an ineligible primary is skipped and an eligible fallback serves the call (spec 9.1, 9.3 pinned).",
+  "setup": {
+    "today": "2026-11-07",
+    "contracts": [
+      "verify-identity"
+    ],
+    "suppliers": [
+      {
+        "adapter_id": "a",
+        "supplier_id": "A",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        },
+        "regions": [
+          "US"
+        ]
+      },
+      {
+        "adapter_id": "b",
+        "supplier_id": "B",
+        "capability": "verify-identity",
+        "behaviour": {
+          "respond": {
+            "output": {
+              "verdict": "pass",
+              "reason_codes": []
+            },
+            "evidence": [
+              {
+                "type": "report",
+                "reference": "r1"
+              }
+            ],
+            "confidence": 0.95
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "opcp_version": "0.1",
+        "capability": "verify-identity",
+        "version": 1,
+        "mode": "pinned",
+        "authored_by": "maker",
+        "approved_by": "checker",
+        "candidates": [
+          "a",
+          "b"
+        ]
+      }
+    ]
+  },
+  "calls": [
+    {
+      "capability": "verify-identity",
+      "input": {
+        "full_name": "Alex Tan",
+        "date_of_birth": "1990-04-12",
+        "document": {
+          "type": "passport",
+          "number": "K1234567",
+          "issuing_country": "SG"
+        }
+      },
+      "data_classification": "confidential",
+      "idempotency_key": "k1",
+      "expect": {
+        "status": "ok",
+        "supplier": "B",
+        "rclass": "R0",
+        "gate_decision": {
+          "allowed": true,
+          "rclass": "R0"
+        }
+      },
+      "residency": [
+        "SG"
+      ]
+    }
+  ],
+  "expect_final": {
+    "invocations": {
+      "a": 0,
+      "b": 1
+    }
+  }
+}
