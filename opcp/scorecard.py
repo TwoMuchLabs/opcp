@@ -205,6 +205,14 @@ def evaluate(doc: Mapping[str, Any]) -> Result:
     settings = {**DEFAULTS, **doc.get("settings", {})}
     date = doc.get("assessment_date") or dt.date.today().isoformat()
     today = dt.date.fromisoformat(date)
+    # Only a completed swap drill makes a time-to-swap proven (spec 12.3): not one dated after the assessment.
+    early = [f"process {p['id']}: drill_date {p['time_to_swap']['drill_date']} is after the assessment date {date}; "
+             "a proven time-to-swap needs a completed drill (spec 12.3)"
+             for p in doc["processes"]
+             if p["time_to_swap"].get("confidence") == "proven" and p["time_to_swap"].get("drill_date")
+             and dt.date.fromisoformat(p["time_to_swap"]["drill_date"]) > today]
+    if early:
+        raise ValidationFailed("assessment", early)
     processes = [evaluate_process(p, settings, today) for p in doc["processes"]]
 
     critical = [p for p in processes if p.critical]
