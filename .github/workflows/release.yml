@@ -44,11 +44,11 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.resolve.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: release-tools
           sparse-checkout: tools/release
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
       - name: Resolve the commit to release
@@ -56,7 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python "$TOOL" resolve --tag "$TAG" --fallback "$GITHUB_SHA"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.resolve.outputs.sha }}
           path: source
@@ -89,11 +89,11 @@ jobs:
           opcp scorecard run examples/example-bank-answers.yaml -o "assets/opcp-example-report-$v.html"
           opcp scorecard readout examples/example-bank-answers.yaml -o "assets/opcp-example-readout-$v.html"
           cp dist/*.whl dist/*.tar.gz assets/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-assets
           path: source/assets/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
           path: source/dist/
@@ -104,19 +104,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: release-tools
           sparse-checkout: tools/release
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.build.outputs.sha }}
           path: source
           sparse-checkout: docs/releases
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-assets
           path: assets
@@ -141,14 +141,14 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: release-tools
           sparse-checkout: tools/release
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dist
           path: dist
@@ -156,7 +156,7 @@ jobs:
         id: check
         run: python "$TOOL" pypi-check --dist dist --version "${{ needs.build.outputs.version }}"
       - if: steps.check.outputs.publish == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           # Safe here: pypi-check has already refused any file PyPI holds with different contents,
           # so only files PyPI holds byte-for-byte are skipped.

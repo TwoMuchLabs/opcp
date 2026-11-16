@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable, Mapping
 
@@ -19,6 +20,23 @@ class Approval:
 
 
 Approver = Callable[[Request, Contract, RClass, Decision], Approval]
+
+
+def same_person(a: str, b: str) -> bool:
+    """Whether two approver identities name the same person, ignoring case, spacing and Unicode form.
+
+    Identities come from a deployment's directory, so the gate cannot resolve aliases or look-alike
+    characters from different scripts. It does refuse the cheap ways to count one person twice:
+    "alice" and "Alice", or "alice" and "alice ".
+    """
+    return _canonical(a) == _canonical(b)
+
+
+def _canonical(identity: str) -> str:
+    # Invisible format characters (zero-width spaces and the like) are dropped, so they can't make a blank
+    # name look filled in, or one person look like two.
+    visible = "".join(ch for ch in unicodedata.normalize("NFKC", identity) if unicodedata.category(ch) != "Cf")
+    return " ".join(visible.casefold().split())
 
 
 @dataclass(frozen=True)
@@ -86,11 +104,14 @@ class AuthorityGate:
             approval = self.approver(request, contract, rclass, decision)
         except Exception as exc:  # an approver failure is a refusal, never an approval
             return result(False, f"approver failed ({type(exc).__name__}); treated as declined")
-        if not approval.approved or not approval.by:
+        if not approval.approved:
             return result(False, approval.reason or "approval declined")
-        approvers: tuple[str, ...] = (approval.by,)
+        if not _canonical(approval.by or ""):  # an approval must say who gave it
+            return result(False, "approval names no approver; treated as declined")
+        approvers: tuple[str, ...] = (approval.by.strip(),)
         if rclass is RClass.R4 and self.two_person_r4:
-            if not approval.second_by or approval.second_by == approval.by:
+            second = (approval.second_by or "").strip()
+            if not _canonical(second) or same_person(second, approval.by):
                 return result(False, "R4 requires a second, different approver")
-            approvers = (approval.by, approval.second_by)
+            approvers = (approval.by.strip(), second)
         return result(True, approval.reason or "approved", approvers)

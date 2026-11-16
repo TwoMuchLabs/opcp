@@ -115,3 +115,27 @@ def test_all_demo_adapters_pass_conformance():
     for adapter in plane.adapters.values():
         report = check_adapter(adapter, plane.contracts[adapter.profile.capability])
         assert report.passed, report.render()
+
+
+def test_proven_time_to_swap_needs_a_drill_dated_by_the_assessment():
+    # Red-team round 2: a drill dated after the assessment (not yet run) still counted as proven.
+    import copy
+
+    from opcp._io import ValidationFailed, load_document
+    from opcp._paths import data_dir
+    from opcp.scorecard import evaluate, evaluate_answers
+
+    doc = copy.deepcopy(load_document(data_dir("examples") / "example-bank.yaml"))
+    proven = [p for p in doc["processes"] if p["time_to_swap"].get("confidence") == "proven"]
+    assert proven, "the example needs a proven process for this test"
+    proven[0]["time_to_swap"]["drill_date"] = "2031-01-01"
+    with pytest.raises(ValidationFailed, match="after the assessment date"):
+        evaluate(doc)
+    proven[0]["time_to_swap"]["drill_date"] = doc["assessment_date"]  # a drill on the day still counts
+    evaluate(doc)
+
+    answers = copy.deepcopy(load_document(data_dir("examples") / "example-bank-answers.yaml"))
+    target = next(p for p in answers["processes"] if "ERS-EXT-04" in p["answers"])
+    target["answers"]["ERS-EXT-04"]["value"] = "2031-01-01"
+    with pytest.raises(ValidationFailed, match="after the assessment date"):
+        evaluate_answers(answers)

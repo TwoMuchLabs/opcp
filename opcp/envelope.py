@@ -99,3 +99,15 @@ class Response:
         if self.outcome is not None:
             doc["outcome"] = self.outcome
         return doc
+
+    @classmethod
+    def from_dict(cls, doc: dict[str, Any]) -> "Response":
+        """The inverse of :meth:`to_dict`, for responses read back from a store."""
+        supplier = doc.get("supplier") or {}
+        return cls(
+            trace_id=doc["trace_id"], status=doc["status"], rclass=doc["rclass"],
+            route_mode=doc["route"]["mode"], route_reason=doc["route"]["reason"], latency_ms=doc["latency_ms"],
+            output=doc.get("output"), evidence=list(doc.get("evidence", [])), confidence=doc.get("confidence"),
+            cost=doc.get("cost"), supplier_id=supplier.get("id"), adapter_version=supplier.get("adapter_version"),
+            error=doc.get("error"), outcome=doc.get("outcome"),
+        )

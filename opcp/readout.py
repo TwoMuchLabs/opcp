@@ -186,7 +186,7 @@ def render_html(doc: Mapping[str, Any], today: dt.date | None = None) -> str:
     status = (f"Self-assessment against the {_e(result.method)}. Not a certification. "
               + (f"Prepared by {_e(person(so['prepared_by']))}. " if so.get("prepared_by") else "")
               + (f"Reviewed by {_e(person(so['reviewed_by']))}." if so.get("reviewed_by") else "<strong>Not independently reviewed.</strong>"))
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Exit-readiness readout · {_e(result.organisation)}</title><style>{_CSS}</style></head><body><main>
 <section class="page">
 <div class="small muted">Exit-readiness readout</div><h1>{_e(result.organisation)}</h1>

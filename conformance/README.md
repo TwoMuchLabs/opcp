@@ -77,6 +77,8 @@ The swap-drill format above describes one document. A runtime fixture describes 
 
 An expectation a fixture leaves out is not checked.
 
+**Test suppliers must not deduplicate.** A harness's scripted suppliers should perform every call they receive. If they remember results by idempotency key, as the reference `Adapter` base class does, a runtime with no idempotency of its own passes RT-21. The reference harness and `opcp.conformance.check_runtime` use suppliers without that memory.
+
 ## Running them
 
 The reference implementation runs the swap-drill fixtures in `tests/test_conformance_fixtures.py` and the runtime fixtures in `tests/test_runtime_conformance.py`, which is its *harness*: it builds the world, makes the calls and reports the observable facts above. Another implementation should load each swap-drill file, evaluate `evidence`, map its result to one of the three outcomes, and compare with `expected_outcome`; for runtime fixtures, it writes its own harness over the same files.

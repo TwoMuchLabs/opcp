@@ -205,6 +205,14 @@ def evaluate(doc: Mapping[str, Any]) -> Result:
     settings = {**DEFAULTS, **doc.get("settings", {})}
     date = doc.get("assessment_date") or dt.date.today().isoformat()
     today = dt.date.fromisoformat(date)
+    # Only a completed swap drill makes a time-to-swap proven (spec 12.3): not one dated after the assessment.
+    early = [f"process {p['id']}: drill_date {p['time_to_swap']['drill_date']} is after the assessment date {date}; "
+             "a proven time-to-swap needs a completed drill (spec 12.3)"
+             for p in doc["processes"]
+             if p["time_to_swap"].get("confidence") == "proven" and p["time_to_swap"].get("drill_date")
+             and dt.date.fromisoformat(p["time_to_swap"]["drill_date"]) > today]
+    if early:
+        raise ValidationFailed("assessment", early)
     processes = [evaluate_process(p, settings, today) for p in doc["processes"]]
 
     critical = [p for p in processes if p.critical]
@@ -436,7 +444,7 @@ def render_html(result: Result) -> str:
                    f'<ul class="sources small">{items}</ul>')
     else:
         sources = ""
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Exit-Readiness Scorecard · {_e(result.organisation)}</title><style>{_CSS}</style></head><body><main>
 <div class="small muted">Exit-Readiness Scorecard</div><h1>{_e(result.organisation)}</h1><div class="muted">{meta}</div>
 <div class="privacy">Generated locally by OPCP {__version__}. No data left this machine.</div>{status}

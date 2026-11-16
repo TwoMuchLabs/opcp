@@ -15,6 +15,7 @@ from .contract import Contract
 from .envelope import CLASSIFICATIONS, Request, Response, classification_rank
 from .eventlog import EventLog
 from .gate import AuthorityGate, GateResult
+from .idempotency import IdempotencyStore
 from .rclass import RClass
 from .router import Route, concentration, eligible, exclusion_reasons, order
 
@@ -68,6 +69,7 @@ class ControlPlane:
         today: dt.date | None = None,
         store_values: bool = False,
         require_accountable_role: bool = True,
+        idempotency_store: IdempotencyStore | None = None,
     ):
         self.contracts = dict(contracts)
         self.adapters = {a.profile.adapter_id: a for a in adapters}
@@ -77,10 +79,14 @@ class ControlPlane:
         self.today = today
         self.store_values = store_values
         self.require_accountable_role = require_accountable_role
-        self._responses: dict[tuple[str, str, str], tuple[str, Response]] = {}
-        # Keys whose last attempt had an unknown outcome at a supplier with a lasting effect:
-        # key -> (input fingerprint, adapter id, supplier id). A retry goes back to that supplier and no other (#27).
-        self._unresolved: dict[tuple[str, str, str], tuple[str, str, str]] = {}
+        # Idempotency records (spec 7.1). In memory by default; a FileIdempotencyStore keeps them across restarts.
+        self.idempotency = idempotency_store if idempotency_store is not None else IdempotencyStore()
+        # Completed responses: key -> (input fingerprint, response).
+        self._responses = self.idempotency.completed
+        # Keys where a supplier with a lasting effect may have acted and the outcome is not known: key ->
+        # (input fingerprint, adapter id, supplier id). A retry goes back to that supplier and no other (#27).
+        # Written before each such call, so a crash mid-call leaves the same protection.
+        self._unresolved = self.idempotency.unresolved
         # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
         self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
         self._key_locks_guard = threading.Lock()
@@ -306,14 +312,24 @@ class ControlPlane:
         self.log.append("route", trace, mode=route.mode, route_version=route.version, reason=why,
                         order=[a.profile.adapter_id for a in ranked], excluded=excluded)
 
+        def reserve(adapter: Adapter) -> None:
+            """Before calling a supplier with a lasting effect, record that it may be about to act."""
+            if effectful:
+                self._unresolved[cache_key] = (fingerprint, adapter.profile.adapter_id, adapter.profile.supplier_id)
+
+        def resolved(response: Response) -> Response:
+            done = finish(response, verdict)  # the completed record is written first ...
+            self._unresolved.pop(cache_key, None)  # ... so there is no moment when the key protects nothing
+            return done
+
         for adapter in ranked:
+            reserve(adapter)
             result = self._attempt(adapter, contract, request, leased, route, why, verdict, attempts, effectful=effectful)
             if isinstance(result, _Unknown):
                 return unknown(result.adapter, result.detail)
             if result is not None:
-                self._unresolved.pop(cache_key, None)
-                return finish(result, verdict)
-            if adapter is reserved:  # it reported a definite failure, so nothing happened under this key
+                return resolved(result)
+            if effectful or adapter is reserved:  # a definite failure: nothing happened under this key there
                 self._unresolved.pop(cache_key, None)
 
         # Escalation (spec 9.1, 9.3)
@@ -321,13 +337,14 @@ class ControlPlane:
             esc = self.adapters[route.escalation]
             reasons = exclusion_reasons(esc, contract, request, today, verdict.rclass)
             if not reasons:
+                reserve(esc)
                 result = self._attempt(esc, contract, request, leased, route, "escalated to " + esc.profile.adapter_id,
                                        verdict, attempts, escalation=True, effectful=effectful)
                 if isinstance(result, _Unknown):
                     return unknown(result.adapter, result.detail)
                 if result is not None:
-                    self._unresolved.pop(cache_key, None)
-                    return finish(result, verdict)
+                    return resolved(result)
+                self._unresolved.pop(cache_key, None)
             else:
                 attempts.append(f"{esc.profile.adapter_id}: escalation supplier not eligible ({'; '.join(reasons)})")
 
