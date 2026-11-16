@@ -12,7 +12,8 @@ Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, har
 - **Idempotency records that survive a restart or a crash** (#60). `opcp.idempotency.FileIdempotencyStore` keeps completed responses and unresolved outcomes in a file synced to disk, read back on start, with a `retention` window for completed records. Before calling a supplier of an effectful capability, the control plane records that it may be about to act, so a crash mid-call cannot lead to a second posting at another supplier after a restart. `ControlPlane(idempotency_store=...)`; the default stays in memory. See `docs/ARCHITECTURE.md`.
 - **Hardening: generated pages block network requests** (#58). The offline form, report and readout declare a Content Security Policy: no network access, and no scripts at all in reports. YAML documents that expand past one million values through aliases are refused.
 - **CI** (#59). Actions are pinned to commit SHAs, including the PyPI publish step; Dependabot keeps them current; the offline form's browser test runs in CI.
-
+- **Industry taxonomy mappings** (`docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
+- The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
 ### Changes you may need to make
 
 - `evaluate_swap()` now requires the six revision arguments (`process_incumbent_revision` and the rest); a missing or blank one raises `ValueError`.
@@ -53,8 +54,6 @@ Supplier portability becomes something you can test, not just assess.
 - **Sponsor readout** (`opcp scorecard readout`). A two-page, printable pack for the pilot's decision meeting. It shows a grid of every critical process against the seven measures, summary tiles (ratings, evidence coverage, proven swaps, largest supplier share), the decisions for the sponsor in order of urgency, and each renewing contract's last day to give notice (end date minus notice period). Release builds attach an example readout.
 - **OCEL 2.0 export** (`opcp ocel`, `docs/PROCESS-MINING.md`). Converts an exported event log to OCEL 2.0 JSON for process-mining tools. Requests, capabilities, processes and suppliers become objects, and each log entry becomes an event linked to them. No input or output values are exported unless the log holds them. Checked by reading the demo log with PM4Py's OCEL 2.0 reader.
 - **Fix:** the control plane now uses the event log it is given, even when that log is empty.
-- **Industry taxonomy mappings** (`docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
-- The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
 
 ## 0.2.0 (draft) — 2026-10-24
 
