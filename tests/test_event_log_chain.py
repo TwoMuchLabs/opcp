@@ -91,3 +91,30 @@ def test_runtime_with_a_chained_log_verifies():
     p.call("verify-identity", PERSON, idempotency_key="k", **CALL)
     p.call("unknown", {}, idempotency_key="k2", **CALL)
     assert verify_chain(lines(p.log), p.log.head()).ok and len(p.log) > 4
+
+
+def test_concurrent_appends_keep_the_chain_intact(tmp_path):
+    # Calls with different idempotency keys run concurrently (and shadow calls run on background
+    # workers), so appends race. Before the fix every trial below produced a broken chain.
+    import sys
+    import threading
+
+    old = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        log = EventLog(tmp_path / "events.jsonl", chain=True)
+
+        def worker(n):
+            for i in range(200):
+                log.append("x", f"t{n}", i=i)
+
+        threads = [threading.Thread(target=worker, args=(n,)) for n in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        sys.setswitchinterval(old)
+    assert len(log) == 1600
+    assert verify_chain(log._lines).ok
+    assert verify_chain((tmp_path / "events.jsonl").read_text(encoding="utf-8").splitlines(), log.head()).ok
