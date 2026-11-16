@@ -48,6 +48,7 @@ class ControlPlane:
         store_values: bool = False,
         require_accountable_role: bool = True,
         shadow_workers: int = 2,
+        shadow_queue_limit: int = 100,
     ):
         self.contracts = dict(contracts)
         self.adapters = {a.profile.adapter_id: a for a in adapters}
@@ -63,6 +64,8 @@ class ControlPlane:
         self._key_locks_guard = threading.Lock()
         # Shadow calls run in the background, so the live caller never waits for them (spec 9.6).
         self._shadow_workers = shadow_workers
+        # A slow shadow supplier must not pile up work (and copies of leased data) without limit.
+        self._shadow_queue_limit = shadow_queue_limit
         self._shadow_pool: ThreadPoolExecutor | None = None
         self._shadow_pending: set[Future] = set()
         self._shadow_guard = threading.Lock()
@@ -366,13 +369,19 @@ class ControlPlane:
             # Private copies: the caller may change its objects once the live response is returned.
             payload = json.loads(json.dumps(leased, default=str))
             live_output = json.loads(json.dumps(live.output or {}, default=str))
-            with self._shadow_guard:
-                if self._shadow_pool is None:
-                    self._shadow_pool = ThreadPoolExecutor(max_workers=self._shadow_workers,
-                                                           thread_name_prefix="opcp-shadow")
-                future = self._shadow_pool.submit(self._run_shadow, spec, contract, request, payload, withheld,
-                                                  live_output, live.confidence, base)
-                self._shadow_pending.add(future)
+            with self._shadow_guard:  # check and submit together, so concurrent calls can't overshoot the limit
+                future = None
+                if len(self._shadow_pending) < self._shadow_queue_limit:
+                    if self._shadow_pool is None:
+                        self._shadow_pool = ThreadPoolExecutor(max_workers=self._shadow_workers,
+                                                               thread_name_prefix="opcp-shadow")
+                    future = self._shadow_pool.submit(self._run_shadow, spec, contract, request, payload, withheld,
+                                                      live_output, live.confidence, base)
+                    self._shadow_pending.add(future)
+            if future is None:
+                self.log.append("shadow", trace, **base, outcome="skipped",
+                                reason=f"shadow queue full ({self._shadow_queue_limit} calls waiting)")
+                return
             future.add_done_callback(self._shadow_finished)
         except Exception as exc:  # nothing about the shadow may change the live response
             self._log_shadow_error(trace, base, exc)

@@ -278,3 +278,23 @@ def test_close_waits_for_outstanding_shadows():
     plane.call("verify-identity", PERSON, idempotency_key="t6", **CALL)
     plane.close()
     assert [e["outcome"] for e in log if e["kind"] == "shadow"] == ["ok"]
+
+
+def test_a_slow_shadow_supplier_cannot_pile_up_work_without_limit():
+    # Red-team round 2: pending shadow calls (each holding a copy of leased data) grew with every request.
+    gate = threading.Event()
+
+    class Stuck(Check):
+        def invoke(self, payload, request):
+            gate.wait(10)
+            return super().invoke(payload, request)
+
+    alt = Stuck(profile("alt"))
+    plane, _, log = setup(alt, shadow_queue_limit=5)
+    for i in range(20):
+        assert plane.call("verify-identity", {**PERSON, "full_name": f"P{i}"}, idempotency_key=f"q{i}", **CALL).ok
+    assert len(plane._shadow_pending) <= 5
+    gate.set()
+    entries = shadow_entries(plane)
+    full = [e for e in entries if e["outcome"] == "skipped" and "queue full" in e["reason"]]
+    assert len(full) == 15 and sum(e["outcome"] == "ok" for e in entries) == 5
