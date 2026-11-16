@@ -37,12 +37,21 @@ CALL_DEFAULTS = {"process_id": "p", "step": "s", "principal": "agent", "accounta
 
 
 class Scripted(Adapter):
-    """A supplier that does what the fixture says and records exactly what it received."""
+    """A supplier that does what the fixture says and records exactly what it received.
+
+    It keeps no idempotency memory of its own, unlike the ``Adapter`` base class. A fixture must pass
+    because the runtime prevented a repeat (spec 7.1), not because the test supplier deduplicated it.
+    """
 
     def __init__(self, profile: SupplierProfile, behaviour: dict):
         super().__init__(profile)
         self.behaviour = behaviour
         self.received: list[dict] = []
+
+    def call(self, payload, request):
+        result = self.invoke(payload, request)
+        self.invocations += 1
+        return result
 
     def invoke(self, payload, request):
         self.received.append(json.loads(json.dumps(payload)))

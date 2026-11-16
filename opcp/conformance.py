@@ -62,7 +62,14 @@ def check_adapter(adapter: Adapter, contract: Contract) -> ConformanceReport:
 
 
 class _Probe(Adapter):
-    """A supplier that records what it receives and returns a valid result for its contract."""
+    """A supplier that records what it receives and returns a valid result for its contract.
+
+    It deliberately keeps no idempotency memory: the runtime under test must prevent repeats itself
+    (spec 7.1). With the ``Adapter`` base class's memory, a runtime with no idempotency at all passed.
+    """
+
+    def call(self, payload, request):
+        return self.invoke(payload, request)
 
     OUTPUTS = {
         "check": {"verdict": "pass", "reason_codes": []},
