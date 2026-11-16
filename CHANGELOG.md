@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (draft) — 2026-11-16
+
+Two critical fixes: the runtime could perform a payment or posting twice, and the swap-drill evaluator could pass a drill whose authority policy had changed. Everyone on 0.3.0 should upgrade.
 
 - **Security fix (critical, issue #27): no failover after an unknown outcome.** When a supplier of an effectful capability (Reversibility Class R2 or above, or the `transact` or `notify` archetype) may have acted but sent no usable reply (a timeout, a dropped connection, or output the contract rejects), the control plane used to try the next supplier. A payment or ledger posting could then happen twice, at two suppliers, while the response reported one success. Now:
   - the call stops with `status: failed`, `outcome: "unknown"`, and `supplier` naming the supplier to reconcile with;
@@ -16,6 +18,11 @@
 - **Fix:** concurrent appends to a hash-chained event log could read the same previous hash, so `opcp log verify` reported a broken chain for a log nobody had altered. Calls with different idempotency keys run concurrently, so any multi-threaded deployment with `chain=True` was affected. `EventLog.append` is now atomic, and the file is written before the in-memory copy.
 - **Tamper-evident event log (opt-in).** `EventLog(..., chain=True)` adds `prev_hash` to every entry, and `opcp log verify events.jsonl [--head H]` reports the first changed, inserted, removed or reordered entry. With a head hash kept elsewhere, it also detects entries removed from the end. Off by default while issue #33 discusses making it a specification SHOULD. See `docs/EVENT-LOG.md`.
 - **Developer guides.** `docs/QUICKSTART.md` (15 minutes, with a runnable example in `examples/quickstart/`), `docs/ARCHITECTURE.md` (the parts, the call sequence, what OPCP is not, and how it relates to adjacent work), `docs/ADAPTERS.md` and `docs/TROUBLESHOOTING.md`. `tests/test_docs_examples.py` checks that the example prints what the guide shows, that each "change something" step behaves as described, and that every error message quoted in the troubleshooting guide still exists in the code.
+- **Fix (critical): the swap-drill evaluator enforces the invariants it promises.** `opcp swap-drill` passed a record whose authority-policy revisions differed while the "unchanged" gate was true (SWAP-DRILL section 3), passed a `proven` time-to-swap with no drill date because it never ran the schema (section 1), and accepted regression counts that did not match the cases. It now validates the record against `schema/swap-drill.schema.json`, rejects an ownership gate that disagrees with its revisions, and rejects counts or per-case results that don't match. No specification text changed.
+- **Fix:** `evaluate_swap()` derives the three ownership invariants from the revisions it compares, so a caller cannot assert "unchanged" while passing different revisions, and it raises `ValueError` for a `proven` time-to-swap without a drill date instead of using today's date (SWAP-DRILL section 6).
+- **Conformance fixtures.** `conformance/` holds language-neutral test cases any implementation can run: SD-01 to SD-15 for swap-drill records, and RT-01 to RT-43 for the runtime (authority gate, every eligibility filter, context lease, routing modes, escalation, concentration limits, output validation, maker-checker, idempotency and unknown outcomes). Each runtime fixture was checked against a runtime with its rule disabled.
+- **Versioning.** ADR 0001 (`docs/adr/`) inventories the project's version numbers and proposes a model; the normative change is under review in #46. `tests/test_version_consistency.py` catches drift between the package, README, changelog and release notes.
+- **Package metadata** now links the repository, documentation, specification, issues and changelog on PyPI.
 - NOTICE and README now record that the Reversibility Classes specification is licensed under Apache 2.0 (from its v0.3.1); it was CC BY 4.0 before.
 
 ## 0.3.0 (draft) — 2026-11-02
