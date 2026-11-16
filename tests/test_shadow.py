@@ -298,3 +298,15 @@ def test_a_slow_shadow_supplier_cannot_pile_up_work_without_limit():
     entries = shadow_entries(plane)
     full = [e for e in entries if e["outcome"] == "skipped" and "queue full" in e["reason"]]
     assert len(full) == 15 and sum(e["outcome"] == "ok" for e in entries) == 5
+
+
+def test_shadow_runs_after_the_live_response_is_recorded_with_a_durable_store(tmp_path):
+    # With #60 merged, the live call writes its idempotency record before any shadow work starts.
+    from opcp.idempotency import FileIdempotencyStore
+    alt = Check(profile("alt"))
+    store = FileIdempotencyStore(tmp_path / "idem.jsonl")
+    plane, _, _ = setup(alt, idempotency_store=store)
+    assert plane.call("verify-identity", PERSON, idempotency_key="d1", **CALL).ok
+    assert len(store.completed) == 1 and not store.unresolved
+    (entry,) = shadow_entries(plane)
+    assert entry["outcome"] == "ok"

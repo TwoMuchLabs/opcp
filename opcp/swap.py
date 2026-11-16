@@ -144,12 +144,12 @@ def evaluate_swap(
     completed_at: str | None = None,
     measured_seconds: float = 0.0,
     drill_id: str | None = None,
-    process_incumbent_revision: str = "process:current",
-    process_candidate_revision: str = "process:current",
-    context_lease_incumbent_revision: str = "context-lease:current",
-    context_lease_candidate_revision: str = "context-lease:current",
-    authority_policy_incumbent_revision: str = "authority-policy:current",
-    authority_policy_candidate_revision: str = "authority-policy:current",
+    process_incumbent_revision: str | None = None,
+    process_candidate_revision: str | None = None,
+    context_lease_incumbent_revision: str | None = None,
+    context_lease_candidate_revision: str | None = None,
+    authority_policy_incumbent_revision: str | None = None,
+    authority_policy_candidate_revision: str | None = None,
     execution_mode: str = "shadow",
     customer_visible: bool = False,
     authority_effects_applied: bool = False,
@@ -166,6 +166,19 @@ def evaluate_swap(
     caller cannot accidentally assert portability while supplying different
     process, context-lease or authority-policy revisions.
     """
+    # SWAP-DRILL section 3: the result MUST identify the revisions compared. Placeholder defaults made the
+    # "unchanged" invariants hold without any real revisions (red-team R-07), so callers must name them.
+    revisions = {
+        "process_incumbent_revision": process_incumbent_revision,
+        "process_candidate_revision": process_candidate_revision,
+        "context_lease_incumbent_revision": context_lease_incumbent_revision,
+        "context_lease_candidate_revision": context_lease_candidate_revision,
+        "authority_policy_incumbent_revision": authority_policy_incumbent_revision,
+        "authority_policy_candidate_revision": authority_policy_candidate_revision,
+    }
+    missing = [name for name, value in revisions.items() if not (value or "").strip()]
+    if missing:
+        raise ValueError("name the revisions the drill compared (SWAP-DRILL section 3); missing: " + ", ".join(missing))
     if measured_seconds < 0 or contracting_days < 0 or onboarding_days < 0:
         raise ValueError("swap timing values cannot be negative")
     if time_to_swap_confidence not in {"estimated", "proven"}:

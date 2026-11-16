@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 
 from opcp._io import ValidationFailed
-from opcp.adapter import Adapter, AdapterResult, SupplierProfile
+from opcp.adapter import Adapter, AdapterResult, DefiniteFailure, SupplierProfile
 from opcp.cli import main
 from opcp.conformance import check_runtime
 from opcp.gate import AuthorityGate
@@ -28,7 +28,7 @@ class Ledger(Adapter):
 
     def invoke(self, payload, request):
         if self.fail:
-            raise RuntimeError("ledger down for account 4410")
+            raise DefiniteFailure("ledger down for account 4410")
         return AdapterResult({"receipt_id": "r", "status": "completed", "compensation": "reverse r"}, [{"type": "a", "reference": "b"}])
 
 
@@ -88,7 +88,7 @@ def test_rejection_is_not_cached_so_a_retry_can_succeed():
     assert p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL).ok
 
 
-def test_budget_refunded_when_call_fails():
+def test_budget_refunded_when_call_definitely_fails():
     gate = AuthorityGate(budgets={"post-journal-entry": 1})
     p = ControlPlane(CATALOGUE, [Ledger(ledger_profile(), fail=True)], [journal_route()], gate=gate, today=TODAY)
     assert p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL).status == "failed"
