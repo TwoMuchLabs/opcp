@@ -7,6 +7,7 @@ import hashlib
 import json
 import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -70,6 +71,8 @@ class ControlPlane:
         store_values: bool = False,
         require_accountable_role: bool = True,
         idempotency_store: IdempotencyStore | None = None,
+        shadow_workers: int = 2,
+        shadow_queue_limit: int = 100,
     ):
         self.contracts = dict(contracts)
         self.adapters = {a.profile.adapter_id: a for a in adapters}
@@ -90,6 +93,13 @@ class ControlPlane:
         # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
         self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
         self._key_locks_guard = threading.Lock()
+        # Shadow calls run in the background, so the live caller never waits for them (spec 9.6).
+        self._shadow_workers = shadow_workers
+        # A slow shadow supplier must not pile up work (and copies of leased data) without limit.
+        self._shadow_queue_limit = shadow_queue_limit
+        self._shadow_pool: ThreadPoolExecutor | None = None
+        self._shadow_pending: set[Future] = set()
+        self._shadow_guard = threading.Lock()
         self._check_configuration(concentration_limit)
 
     # ------------------------------------------------------------ setup
@@ -104,6 +114,8 @@ class ControlPlane:
             ids = set(route.candidates) | {i for ids in route.segments.values() for i in ids}
             if route.escalation:
                 ids.add(route.escalation)
+            if route.shadow:
+                ids.add(route.shadow.adapter)
             for adapter_id in sorted(ids):
                 adapter = self.adapters.get(adapter_id)
                 if adapter is None:
@@ -328,7 +340,9 @@ class ControlPlane:
             if isinstance(result, _Unknown):
                 return unknown(result.adapter, result.detail)
             if result is not None:
-                return resolved(result)
+                done = resolved(result)  # the live response is complete before any shadow work
+                self._shadow(route, contract, request, leased, withheld, done, adapter, verdict, today)
+                return done
             if effectful or adapter is reserved:  # a definite failure: nothing happened under this key there
                 self._unresolved.pop(cache_key, None)
 
@@ -412,3 +426,116 @@ class ControlPlane:
             supplier_id=adapter.profile.supplier_id,
             adapter_version=adapter.profile.adapter_version,
         )
+
+    # ------------------------------------------------------------ shadow (spec 9.6)
+
+    def wait_for_shadows(self, timeout: float | None = None) -> bool:
+        """Block until every shadow call started so far has been recorded. Returns False on timeout.
+
+        Live calls never wait for shadow work; use this before exporting the log or shutting down.
+        """
+        with self._shadow_guard:
+            pending = set(self._shadow_pending)
+        done, not_done = wait(pending, timeout=timeout)
+        return not not_done
+
+    def close(self) -> None:
+        """Finish outstanding shadow calls and stop the background workers."""
+        with self._shadow_guard:
+            pool, self._shadow_pool = self._shadow_pool, None
+        if pool is not None:
+            pool.shutdown(wait=True)
+
+    def _shadow(self, route: Route, contract: Contract, request: Request, leased: dict, withheld: list[str],
+                live: Response, served_by: Adapter, verdict: GateResult, today: dt.date) -> None:
+        """Decide whether this request is copied to the route's shadow supplier, and if so, start it.
+
+        Checks that need no supplier happen here and are logged at once. The shadow call itself runs on a
+        background worker, so it adds nothing to the live call's time, and nothing it does or raises can
+        reach the caller.
+        """
+        spec = route.shadow
+        if spec is None or live.status != "ok" or not spec.selects(request.idempotency_key):
+            return
+        trace = request.trace_id
+        aid = spec.adapter
+        base = {"capability": contract.id, "adapter": aid, "live_adapter": served_by.profile.adapter_id}
+        try:
+            if aid == served_by.profile.adapter_id:
+                self.log.append("shadow", trace, **base, outcome="skipped", reason="the shadow supplier served the live request")
+                return
+            if verdict.rclass > RClass.R0:  # a copy of an action is still an action (SWAP-DRILL 2)
+                self.log.append("shadow", trace, **base, outcome="skipped",
+                                reason=f"shadow runs only for R0; gate applied {verdict.rclass}")
+                return
+            adapter = self.adapters[aid]
+            reasons = exclusion_reasons(adapter, contract, request, today, verdict.rclass)
+            if reasons:  # copying data to a supplier that is not eligible would be a disclosure
+                self.log.append("shadow", trace, **base, outcome="skipped", reason="not eligible: " + "; ".join(reasons))
+                return
+            # Private copies: the caller may change its objects once the live response is returned.
+            payload = json.loads(json.dumps(leased, default=str))
+            live_output = json.loads(json.dumps(live.output or {}, default=str))
+            with self._shadow_guard:  # check and submit together, so concurrent calls can't overshoot the limit
+                future = None
+                if len(self._shadow_pending) < self._shadow_queue_limit:
+                    if self._shadow_pool is None:
+                        self._shadow_pool = ThreadPoolExecutor(max_workers=self._shadow_workers,
+                                                               thread_name_prefix="opcp-shadow")
+                    future = self._shadow_pool.submit(self._run_shadow, spec, contract, request, payload, withheld,
+                                                      live_output, live.confidence, base)
+                    self._shadow_pending.add(future)
+            if future is None:
+                self.log.append("shadow", trace, **base, outcome="skipped",
+                                reason=f"shadow queue full ({self._shadow_queue_limit} calls waiting)")
+                return
+            future.add_done_callback(self._shadow_finished)
+        except Exception as exc:  # nothing about the shadow may change the live response
+            self._log_shadow_error(trace, base, exc)
+
+    def _shadow_finished(self, future: Future) -> None:
+        with self._shadow_guard:
+            self._shadow_pending.discard(future)
+
+    def _log_shadow_error(self, trace: str, base: dict, exc: BaseException) -> None:
+        try:
+            detail = str(exc) if self.store_values else type(exc).__name__
+            self.log.append("shadow", trace, **base, outcome="error", detail=detail)
+        except Exception:  # the log itself failed; there is nowhere left to record it
+            pass
+
+    def _run_shadow(self, spec, contract: Contract, request: Request, payload: dict, withheld: list[str],
+                    live_out: dict, live_confidence: float | None, base: dict) -> None:
+        """The shadow call and its comparison, on a background worker. Every outcome is logged; nothing raises."""
+        trace = request.trace_id
+        adapter = self.adapters[spec.adapter]
+        # The shadow supplier gets the same lease as the live one, and the log says so (spec 11.2).
+        base = {**base, "leased_fields": sorted(payload), "withheld_fields": withheld}
+        try:
+            started = time.perf_counter()
+            try:
+                result = adapter.call(dict(payload), request)
+            except Exception as exc:
+                self._log_shadow_error(trace, base, exc)
+                return
+            latency = (time.perf_counter() - started) * 1000
+            problems = contract.output_errors(result.output)
+            if contract.evidence_required and not result.evidence:
+                problems.append("evidence required but none returned")
+            if problems:
+                shown = problems if self.store_values else [p.split(":")[0] + ": invalid" for p in problems]
+                self.log.append("shadow", trace, **base, outcome="invalid", detail=shown, latency_ms=latency)
+                adapter.forget(dict(payload), request)  # last: a forget() that raises is caught below
+                return
+            declared = list(contract.output_schema.get("properties", {}))
+            fields = list(spec.compare) or declared or sorted(set(live_out) | set(result.output))
+            agreed = [f for f in fields if live_out.get(f) == result.output.get(f)]
+            disagreed = [f for f in fields if f not in agreed]
+            entry = {**base, "outcome": "ok", "agreed": agreed, "disagreed": disagreed,
+                     "confidence": result.confidence, "live_confidence": live_confidence,
+                     "latency_ms": latency, "cost": result.cost}
+            if self.store_values:
+                entry["differences"] = {f: {"live": live_out.get(f), "shadow": result.output.get(f)} for f in disagreed}
+            self.log.append("shadow", trace, **entry)
+        except Exception as exc:
+            self._log_shadow_error(trace, base, exc)

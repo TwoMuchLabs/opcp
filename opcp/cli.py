@@ -205,6 +205,19 @@ def _swap_drill(args: argparse.Namespace) -> int:
     return 0 if result["promotion_ready"] else 1
 
 
+def _shadow_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .drill import load_jsonl, render_text, summarise
+
+    summaries = summarise(load_jsonl(args.path))
+    if args.json:
+        print(json.dumps([s.to_dict() for s in summaries], indent=2))
+    else:
+        sys.stdout.write(render_text(summaries))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="opcp", description="Open Process Control Plane tools. Everything runs locally.")
     parser.add_argument("--version", action="version", version=f"opcp {__version__}")
@@ -258,6 +271,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path")
     p.add_argument("--head", help="The head hash recorded elsewhere, to also detect entries removed from the end")
     p.set_defaults(func=_log_verify)
+
+    p = sub.add_parser("shadow-report", help="Summarise a shadow drill from an exported event log (JSON lines)")
+    p.add_argument("path")
+    p.add_argument("--json", action="store_true", help="Print machine-readable results")
+    p.set_defaults(func=_shadow_report)
 
     p = sub.add_parser("demo", help="Run the reference runtime with simulated suppliers")
     p.set_defaults(func=_demo)

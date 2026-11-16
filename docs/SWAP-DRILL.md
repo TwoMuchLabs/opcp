@@ -22,8 +22,25 @@ For a first pilot, choose an R0 capability where a second supplier already exist
 1. **Start the clock.** Record the date the swap is decided. This is day 0.
 2. **Contracting.** Record the days to a signed agreement, a trial agreement or a standby contract with the alternative supplier. If a standby contract already exists, record 0 and cite it.
 3. **Onboarding.** Record the days for security review, data-protection assessment and any regulator notification the swap would need. If no notification is needed for a drill, record what one would take, and mark that part as estimated.
-4. **Technical cutover.** Point the capability at the alternative supplier. In the OPCP reference runtime this is a route change: a `weighted` route sends a share of traffic to the alternative. The runtime does not yet have a copy-only shadow mode, so a shadow drill sends copies of cases to the alternative through a test harness or the supplier's sandbox. Run until it has handled a representative sample.
-5. **Compare quality.** Use the measures the process already tracks: match rate, accuracy, exception rate, latency, cost per case. It passes when the replacement is equal or better on each measure the process owner chose before the drill.
+4. **Technical cutover.** Point the capability at the alternative supplier. In the OPCP reference runtime, a shadow drill is a `shadow` block on the route ([spec section 9.6](../spec/SPEC.md#96-shadow-calls)), and a live cutover is a `weighted` route that sends a share of traffic to the alternative. Run until it has handled a representative sample.
+
+   ```yaml
+   # Route for verify-identity: Vendor A stays live; Vendor B sees copies of 20% of requests.
+   opcp_version: "0.1"
+   capability: verify-identity
+   version: 4
+   mode: pinned
+   authored_by: Head of Onboarding Technology
+   approved_by: Head of Third-Party Risk
+   candidates: [vendor-a]
+   shadow:
+     adapter: vendor-b
+     sample: 0.2
+     compare: [verdict, reason_codes]
+   ```
+
+   The runtime copies only to a supplier that passes every eligibility check (approved, contracted, permitted for the data and its region). It never acts on the shadow result, and it refuses to shadow anything above R0.
+5. **Compare quality.** Export the event log and run `opcp shadow-report events.jsonl`. Shadow calls finish in the background, so in code call `plane.wait_for_shadows()` (or `plane.close()`) before exporting. The report shows how often the alternative agreed with the live supplier, field by field, plus its errors, latency and cost. Agreement alone is not enough, because the live supplier can be wrong: add the measures the process already tracks, such as accuracy against reviewed cases and exception rate (SWAP-DRILL section 5). It passes when the replacement is equal or better on each measure the process owner chose before the drill.
 6. **Stop the clock.** Record the date the replacement met the quality bar. Then switch back, or keep it as the fallback supplier.
 
 ## Record the result

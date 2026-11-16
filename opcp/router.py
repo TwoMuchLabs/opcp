@@ -19,6 +19,22 @@ MODES = ("pinned", "segmented", "cascade", "weighted", "best_score")
 
 
 @dataclass(frozen=True)
+class ShadowSpec:
+    """Send copies of requests to an alternative supplier and compare, without acting on its result (spec 9.6)."""
+
+    adapter: str
+    sample: float = 1.0
+    compare: tuple[str, ...] = ()
+
+    def selects(self, idempotency_key: str) -> bool:
+        """Deterministic sampling, so the same request is always in or out of the drill."""
+        if self.sample >= 1.0:
+            return True
+        point = int(hashlib.sha256(f"shadow\x1f{idempotency_key}".encode()).hexdigest(), 16) % 10_000 / 10_000
+        return point < self.sample
+
+
+@dataclass(frozen=True)
 class Route:
     capability: str
     version: int
@@ -33,6 +49,7 @@ class Route:
     selection_weights: Mapping[str, float] = field(default_factory=dict)
     escalation: str | None = None
     concentration_exception: str | None = None
+    shadow: ShadowSpec | None = None
 
     @classmethod
     def from_dict(cls, doc: Mapping[str, Any]) -> "Route":
@@ -40,6 +57,9 @@ class Route:
         if not problems:
             stray = sorted(set(doc.get("weights", {})) - set(doc["candidates"]))
             problems += [f"weights: {k!r} is not a candidate" for k in stray]
+            shadow = doc.get("shadow")
+            if shadow and shadow["adapter"] in doc["candidates"][:1]:
+                problems.append("shadow: the shadow supplier must not be the primary candidate")
         if problems:
             raise ValidationFailed(f"route for {doc.get('capability', '?')!r}", problems)
         if doc["authored_by"] == doc["approved_by"]:
@@ -58,6 +78,8 @@ class Route:
             selection_weights=dict(doc.get("selection_weights", {})),
             escalation=doc.get("escalation"),
             concentration_exception=doc.get("concentration_exception"),
+            shadow=(ShadowSpec(doc["shadow"]["adapter"], float(doc["shadow"].get("sample", 1.0)),
+                               tuple(doc["shadow"].get("compare", ()))) if doc.get("shadow") else None),
         )
 
     @classmethod

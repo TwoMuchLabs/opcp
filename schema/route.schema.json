@@ -40,7 +40,18 @@
       }
     },
     "escalation": {"type": "string", "description": "Adapter id of a supplier, normally a human team, that fulfils the same contract and receives requests no other candidate could serve or decide confidently."},
-    "concentration_exception": {"type": "string", "description": "Reference to an approved exception, if this route breaches the concentration limit."}
+    "concentration_exception": {"type": "string", "description": "Reference to an approved exception, if this route breaches the concentration limit."},
+    "shadow": {
+      "type": "object",
+      "description": "Send copies of requests to an alternative supplier and compare its output with the live result, without acting on it (spec 9.6). Runs only when the authority gate applies R0 and the shadow supplier passes every eligibility filter.",
+      "required": ["adapter"],
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {"type": "string", "minLength": 1, "description": "Adapter id of the alternative supplier."},
+        "sample": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 1, "description": "Share of requests to copy, chosen deterministically by idempotency key."},
+        "compare": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "description": "Output fields to compare. Defaults to every field the contract's output declares."}
+      }
+    }
   },
   "allOf": [
     {"if": {"properties": {"mode": {"const": "segmented"}}}, "then": {"required": ["segments"]}},

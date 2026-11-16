@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Shadow calls** (spec section 9.6, `opcp shadow-report`). A route can name a shadow supplier that receives copies of selected R0 requests, after it passes every eligibility filter and only with the leased input. Its output is compared field by field with the live result and recorded, with the fields lent and withheld; it is never returned or acted on. Shadow calls run on background workers, so the live caller never waits for them, and nothing a shadow supplier does or raises can reach the live call. `ControlPlane.wait_for_shadows()` and `close()` let a deployment finish them before exporting the log. Waiting shadow calls are capped (`shadow_queue_limit`, default 100); beyond that, requests are not copied and the skip is logged. `opcp shadow-report` summarises agreement as input to a swap-drill record, not as regression evidence.
+
 ## 0.3.2 (draft) — 2026-11-16
 
 Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, idempotency that survives a restart, and BIAN v14 mappings for the catalogue.
