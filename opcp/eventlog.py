@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -34,16 +35,19 @@ class EventLog:
         self.path = Path(path) if path else None
         self.chain = chain
         self._lines: list[str] = []
+        # One append at a time: concurrent calls must not read the same head, or interleave in the file.
+        self._lock = threading.Lock()
 
     def append(self, kind: str, trace_id: str, **data: Any) -> None:
-        entry = {"at": dt.datetime.now(dt.timezone.utc).isoformat(), "kind": kind, "trace_id": trace_id, **data}
-        if self.chain:
-            entry["prev_hash"] = self.head()
-        line = json.dumps(entry, sort_keys=True, default=str)
-        self._lines.append(line)
-        if self.path:
-            with self.path.open("a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
+        with self._lock:
+            entry = {"at": dt.datetime.now(dt.timezone.utc).isoformat(), "kind": kind, "trace_id": trace_id, **data}
+            if self.chain:
+                entry["prev_hash"] = self.head()
+            line = json.dumps(entry, sort_keys=True, default=str)
+            if self.path:  # write first, so memory never holds an entry the file does not
+                with self.path.open("a", encoding="utf-8") as fh:
+                    fh.write(line + "\n")
+            self._lines.append(line)
 
     def head(self) -> str:
         """Hash of the last entry written, or ``GENESIS`` for an empty log. Keep it to detect truncation."""
