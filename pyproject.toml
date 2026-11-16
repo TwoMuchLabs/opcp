@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opcp"
-version = "0.3.0"
+version = "0.3.1"
 description = "Open Process Control Plane: own your processes, context and authority; rent capabilities from any vendor"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,13 @@ dependencies = ["pyyaml>=6", "jsonschema>=4.18", "rfc3339-validator>=0.1.4", "rf
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/TwoMuchLabs/opcp"
+Documentation = "https://github.com/TwoMuchLabs/opcp/tree/main/docs"
+Specification = "https://github.com/TwoMuchLabs/opcp/blob/main/spec/SPEC.md"
+Issues = "https://github.com/TwoMuchLabs/opcp/issues"
+Changelog = "https://github.com/TwoMuchLabs/opcp/blob/main/CHANGELOG.md"
 
 [project.scripts]
 opcp = "opcp.cli:main"
