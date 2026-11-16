@@ -1,4 +1,16 @@
-from opcp.swap import SwapCase, evaluate_swap
+from opcp.swap import SwapCase
+from opcp.swap import evaluate_swap as _evaluate_swap
+
+# Every drill names the revisions it compared (SWAP-DRILL section 3); tests override the ones they vary.
+REVISIONS = dict(
+    process_incumbent_revision="process:4", process_candidate_revision="process:4",
+    context_lease_incumbent_revision="context-lease:2", context_lease_candidate_revision="context-lease:2",
+    authority_policy_incumbent_revision="authority-policy:7", authority_policy_candidate_revision="authority-policy:7",
+)
+
+
+def evaluate_swap(*args, **kwargs):
+    return _evaluate_swap(*args, **{**REVISIONS, **kwargs})
 
 
 def test_successful_swap_requires_all_invariants_and_regression():

@@ -185,6 +185,12 @@ def _swap_demo(args: argparse.Namespace) -> int:
         candidate="supplier-b",
         cases=cases,
         measured_seconds=2.5 * 24 * 3600,
+        process_incumbent_revision="sme-credit-origination:4",
+        process_candidate_revision="sme-credit-origination:4",
+        context_lease_incumbent_revision="extract-application-documents:lease:2",
+        context_lease_candidate_revision="extract-application-documents:lease:2",
+        authority_policy_incumbent_revision="sme-credit-authority:7",
+        authority_policy_candidate_revision="sme-credit-authority:7",
     )
     evidence = result.evidence()
     print(json.dumps(evidence, indent=2))

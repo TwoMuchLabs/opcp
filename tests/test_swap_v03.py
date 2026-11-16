@@ -3,7 +3,19 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from opcp.swap import SwapCase, evaluate_swap, validate_swap_result
+from opcp.swap import SwapCase, validate_swap_result
+from opcp.swap import evaluate_swap as _evaluate_swap
+
+# Every drill names the revisions it compared (SWAP-DRILL section 3); tests override the ones they vary.
+REVISIONS = dict(
+    process_incumbent_revision="process:4", process_candidate_revision="process:4",
+    context_lease_incumbent_revision="context-lease:2", context_lease_candidate_revision="context-lease:2",
+    authority_policy_incumbent_revision="authority-policy:7", authority_policy_candidate_revision="authority-policy:7",
+)
+
+
+def evaluate_swap(*args, **kwargs):
+    return _evaluate_swap(*args, **{**REVISIONS, **kwargs})
 
 
 SCHEMA = json.loads((Path(__file__).parents[1] / "schema" / "swap-drill.schema.json").read_text())
@@ -138,3 +150,15 @@ def test_proven_without_drill_date_is_refused_not_dated_today():
             cases=[SwapCase("clean", "pass", "pass", "pass")],
             time_to_swap_confidence="proven",
         )
+
+
+def test_a_drill_must_name_the_revisions_it_compared():
+    # Red-team R-07: placeholder defaults ("process:current" on both sides) made the invariants hold vacuously.
+    import pytest
+
+    case = [SwapCase("clean", "pass", "pass", "pass")]
+    with pytest.raises(ValueError, match="name the revisions"):
+        _evaluate_swap(capability="c", incumbent="a", candidate="b", cases=case)
+    with pytest.raises(ValueError, match="authority_policy_candidate_revision"):
+        _evaluate_swap(capability="c", incumbent="a", candidate="b", cases=case,
+                       **{**REVISIONS, "authority_policy_candidate_revision": "  "})
