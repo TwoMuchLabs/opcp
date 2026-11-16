@@ -63,8 +63,27 @@ The order matters. The gate runs **before** any supplier is contacted. Eligibili
 | `router.py` | Routes, eligibility, selection and concentration limits |
 | `gate.py`, `rclass.py` | Authority gate and Reversibility Classes |
 | `runtime.py` | The control plane: the call sequence above |
+| `idempotency.py` | Idempotency records, in memory or in a file that survives restarts |
 | `eventlog.py`, `ocel.py` | Event log and OCEL export |
 | `swap.py`, `swap_drill.py` | Supplier swap drills ([`spec/SWAP-DRILL.md`](../spec/SWAP-DRILL.md)) |
 | `scorecard.py`, `questionbank.py`, `readout.py`, `registers.py` | Exit-Readiness Scorecard tools |
+
+### Idempotency across restarts
+
+By default the control plane keeps idempotency records in memory, so a restart forgets them. A retry after a restart would then repeat a payment or a posting. For anything with a lasting effect (R2 and above, `transact`, `notify`), give it a file:
+
+```python
+from datetime import timedelta
+from opcp.idempotency import FileIdempotencyStore
+
+plane = ControlPlane(contracts, adapters, routes,
+                     idempotency_store=FileIdempotencyStore("idempotency.jsonl", retention=timedelta(days=30)))
+```
+
+- **Completed responses** are replayed after a restart, with the original output and trace id.
+- **Calls cut short by a crash** are covered too. Before calling a supplier with a lasting effect, the control plane records that the supplier may be about to act, and syncs the record to disk. If the process dies during the call, a retry with the same key goes back to that supplier only, and that supplier's own idempotency settles it (spec 8.3).
+- **Retention.** Completed records are kept for the `retention` window you set. Records of possible effects are never dropped automatically.
+- **Protect the file like the event log with values.** It is created readable by its owner only, and it holds responses, including outputs such as receipts or extracted fields.
+- **One process per file.** Instances that share keys need a shared store, such as a database, with the same two mappings (`completed`, `unresolved`).
 
 Another implementation should need only `spec/`, `schema/`, `catalogue/` and the shared conformance fixtures. Where it doesn't, that is a gap in the specification and worth an issue (see #40).
