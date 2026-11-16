@@ -79,8 +79,8 @@ class ControlPlane:
         self.require_accountable_role = require_accountable_role
         self._responses: dict[tuple[str, str, str], tuple[str, Response]] = {}
         # Keys whose last attempt had an unknown outcome at a supplier with a lasting effect:
-        # key -> (input fingerprint, adapter id). A retry goes back to that supplier and no other (issue #27).
-        self._unresolved: dict[tuple[str, str, str], tuple[str, str]] = {}
+        # key -> (input fingerprint, adapter id, supplier id). A retry goes back to that supplier and no other (#27).
+        self._unresolved: dict[tuple[str, str, str], tuple[str, str, str]] = {}
         # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
         self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
         self._key_locks_guard = threading.Lock()
@@ -206,9 +206,8 @@ class ControlPlane:
                 self._responses[cache_key] = (fingerprint, response)
             return response
 
-        def stop(status: str, rclass: str, reason: str, error: str, mode: str = "none", gate: GateResult | None = None,
-                 outcome: str | None = None) -> Response:
-            return finish(Response(trace, status, rclass, mode, reason, 0, error=error, outcome=outcome), gate)
+        def stop(status: str, rclass: str, reason: str, error: str, mode: str = "none", gate: GateResult | None = None) -> Response:
+            return finish(Response(trace, status, rclass, mode, reason, 0, error=error), gate)
 
         pending = self._unresolved.get(cache_key)
         if cache_key in self._responses or (pending is not None and pending[0] != fingerprint):
@@ -276,7 +275,7 @@ class ControlPlane:
             budget unit is kept (``gate`` is None) because the supplier may have used the authority it bounds.
             """
             aid = adapter.profile.adapter_id
-            self._unresolved[cache_key] = (fingerprint, aid)
+            self._unresolved[cache_key] = (fingerprint, aid, adapter.profile.supplier_id)
             message = "; ".join([*attempts, f"outcome unknown at {aid}: {detail}"]) + (
                 f". The supplier may have acted, so no other supplier was tried. Reconcile with {adapter.profile.supplier_id}, "
                 f"or retry with the same idempotency key, which goes back to {aid} only")
@@ -295,9 +294,10 @@ class ControlPlane:
                 self.log.append("route", trace, mode=route.mode, route_version=route.version, reason=why,
                                 order=[], excluded={**excluded, pending[1]: reasons})
                 if reserved is None:
-                    return stop("failed", str(verdict.rclass), why,
-                                f"outcome unknown at {pending[1]}: an earlier attempt with this key may have acted, "
-                                "and that adapter is no longer configured", route.mode, gate=verdict, outcome="unknown")
+                    return finish(Response(trace, "failed", str(verdict.rclass), route.mode, why, 0,
+                                           error=f"outcome unknown at {pending[1]}: an earlier attempt with this key may "
+                                                 f"have acted, and that adapter is no longer configured. Reconcile with {pending[2]}",
+                                           supplier_id=pending[2], adapter_version="unknown", outcome="unknown"), verdict)
                 return unknown(reserved, "an earlier attempt with this key may have acted, and the supplier is not "
                                f"eligible now ({'; '.join(reasons)})", gate=verdict)
             ranked = [reserved, *[a for a in ranked if a is not reserved]]

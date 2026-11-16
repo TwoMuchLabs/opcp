@@ -280,3 +280,14 @@ def test_unknown_outcome_at_the_escalation_supplier_is_reported():
     r = p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
     assert r.outcome == "unknown" and r.supplier_id == "H" and posted == ["H"]
     assert "a: error (DefiniteFailure)" in r.error
+
+
+def test_reserved_adapter_removed_from_configuration_still_names_the_supplier():
+    posted: list[str] = []
+    p = ledger_plane([Ledger(lp("a"), "timeout", postings=posted), Ledger(lp("b"), postings=posted)], jroute(["a", "b"]))
+    p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
+    del p.adapters["a"]  # the adapter was taken out of service
+    p.routes["post-journal-entry"] = jroute(["b"])
+    retry = p.call("post-journal-entry", JOURNAL, idempotency_key="k", **JCALL)
+    assert retry.outcome == "unknown" and retry.supplier_id == "A" and posted == ["A"]
+    assert "no longer configured" in retry.error
