@@ -7,13 +7,15 @@ import hashlib
 import json
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
-from .adapter import Adapter
+from .adapter import Adapter, DefiniteFailure
 from .contract import Contract
 from .envelope import CLASSIFICATIONS, Request, Response, classification_rank
 from .eventlog import EventLog
 from .gate import AuthorityGate, GateResult
+from .rclass import RClass
 from .router import Route, concentration, eligible, exclusion_reasons, order
 
 
@@ -21,9 +23,30 @@ class ConfigurationError(ValueError):
     """The control plane's contracts, adapters and routes do not fit together."""
 
 
+# Archetypes whose effect outlasts the call: a repeat posts, pays, books or sends twice.
+EFFECT_ARCHETYPES = frozenset({"transact", "notify"})
+
+
+def has_lasting_effect(contract: Contract, rclass: RClass) -> bool:
+    """Whether repeating this call at another supplier could repeat an effect that matters.
+
+    True for Reversibility Class R2 and above, and for the ``transact`` and ``notify`` archetypes. For such
+    calls the runtime never moves to another supplier after an attempt whose outcome is unknown (issue #27).
+    """
+    return rclass >= RClass.R2 or contract.archetype in EFFECT_ARCHETYPES
+
+
 def _fingerprint(capability_id: str, payload: Mapping[str, Any]) -> str:
     text = json.dumps({"c": capability_id, "p": payload}, sort_keys=True, default=str)
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+@dataclass
+class _Unknown:
+    """An attempt after which the supplier may have acted, though the runtime cannot accept its result."""
+
+    adapter: Adapter
+    detail: str
 
 
 class ControlPlane:
@@ -55,6 +78,9 @@ class ControlPlane:
         self.store_values = store_values
         self.require_accountable_role = require_accountable_role
         self._responses: dict[tuple[str, str, str], tuple[str, Response]] = {}
+        # Keys whose last attempt had an unknown outcome at a supplier with a lasting effect:
+        # key -> (input fingerprint, adapter id, supplier id). A retry goes back to that supplier and no other (#27).
+        self._unresolved: dict[tuple[str, str, str], tuple[str, str, str]] = {}
         # One call at a time per idempotency key, so concurrent duplicates cannot both reach a supplier.
         self._key_locks: dict[tuple[str, str, str], list] = {}  # key -> [lock, number of callers holding or waiting]
         self._key_locks_guard = threading.Lock()
@@ -183,7 +209,10 @@ class ControlPlane:
         def stop(status: str, rclass: str, reason: str, error: str, mode: str = "none", gate: GateResult | None = None) -> Response:
             return finish(Response(trace, status, rclass, mode, reason, 0, error=error), gate)
 
-        if cache_key in self._responses:  # same key, different payload
+        pending = self._unresolved.get(cache_key)
+        if cache_key in self._responses or (pending is not None and pending[0] != fingerprint):
+            # Same key, different payload. After an unknown outcome the key stays bound to its first input,
+            # because the supplier may have acted on it.
             self.log.append("request", trace, request=request.to_dict(values=False))
             return stop("rejected", str(contract.rclass) if contract else "R4", "idempotency",
                         "idempotency key already used for a different input")
@@ -235,24 +264,70 @@ class ControlPlane:
             ranked, why = order(route, contract, pool, request, verdict.rclass)
         except ValueError as exc:
             return stop("failed", str(verdict.rclass), "routing refused", str(exc), route.mode, gate=verdict)
+
+        attempts: list[str] = []
+        effectful = has_lasting_effect(contract, verdict.rclass)
+
+        def unknown(adapter: Adapter, detail: str, gate: GateResult | None = None) -> Response:
+            """Stop after an attempt whose outcome is unknown; never try another supplier (issue #27).
+
+            The key stays bound to this supplier, so a retry with it goes back there and nowhere else. The
+            budget unit is kept (``gate`` is None) because the supplier may have used the authority it bounds.
+            """
+            aid = adapter.profile.adapter_id
+            self._unresolved[cache_key] = (fingerprint, aid, adapter.profile.supplier_id)
+            message = "; ".join([*attempts, f"outcome unknown at {aid}: {detail}"]) + (
+                f". The supplier may have acted, so no other supplier was tried. Reconcile with {adapter.profile.supplier_id}, "
+                f"or retry with the same idempotency key, which goes back to {aid} only")
+            return finish(Response(trace, "failed", str(verdict.rclass), route.mode, why, 0, error=message,
+                                   supplier_id=adapter.profile.supplier_id, adapter_version=adapter.profile.adapter_version,
+                                   outcome="unknown"), gate)
+
+        # A retry after an unknown outcome goes to the same supplier first, and only on to others if that
+        # supplier now reports a definite failure (it did nothing under this key).
+        reserved: Adapter | None = None
+        if pending is not None:
+            reserved = self.adapters.get(pending[1])
+            reasons = (exclusion_reasons(reserved, contract, request, today, verdict.rclass)
+                       if reserved is not None else ["no longer configured"])
+            if reserved is None or reasons:
+                self.log.append("route", trace, mode=route.mode, route_version=route.version, reason=why,
+                                order=[], excluded={**excluded, pending[1]: reasons})
+                if reserved is None:
+                    return finish(Response(trace, "failed", str(verdict.rclass), route.mode, why, 0,
+                                           error=f"outcome unknown at {pending[1]}: an earlier attempt with this key may "
+                                                 f"have acted, and that adapter is no longer configured. Reconcile with {pending[2]}",
+                                           supplier_id=pending[2], adapter_version="unknown", outcome="unknown"), verdict)
+                return unknown(reserved, "an earlier attempt with this key may have acted, and the supplier is not "
+                               f"eligible now ({'; '.join(reasons)})", gate=verdict)
+            ranked = [reserved, *[a for a in ranked if a is not reserved]]
+            why = f"retry to {pending[1]} after an unknown outcome; then {why}"
+
         self.log.append("route", trace, mode=route.mode, route_version=route.version, reason=why,
                         order=[a.profile.adapter_id for a in ranked], excluded=excluded)
 
-        attempts: list[str] = []
         for adapter in ranked:
-            response = self._attempt(adapter, contract, request, leased, route, why, verdict, attempts)
-            if response is not None:
-                return finish(response, verdict)
+            result = self._attempt(adapter, contract, request, leased, route, why, verdict, attempts, effectful=effectful)
+            if isinstance(result, _Unknown):
+                return unknown(result.adapter, result.detail)
+            if result is not None:
+                self._unresolved.pop(cache_key, None)
+                return finish(result, verdict)
+            if adapter is reserved:  # it reported a definite failure, so nothing happened under this key
+                self._unresolved.pop(cache_key, None)
 
         # Escalation (spec 9.1, 9.3)
         if route.escalation and route.escalation not in {a.profile.adapter_id for a in ranked}:
             esc = self.adapters[route.escalation]
             reasons = exclusion_reasons(esc, contract, request, today, verdict.rclass)
             if not reasons:
-                response = self._attempt(esc, contract, request, leased, route, "escalated to " + esc.profile.adapter_id,
-                                         verdict, attempts, escalation=True)
-                if response is not None:
-                    return finish(response, verdict)
+                result = self._attempt(esc, contract, request, leased, route, "escalated to " + esc.profile.adapter_id,
+                                       verdict, attempts, escalation=True, effectful=effectful)
+                if isinstance(result, _Unknown):
+                    return unknown(result.adapter, result.detail)
+                if result is not None:
+                    self._unresolved.pop(cache_key, None)
+                    return finish(result, verdict)
             else:
                 attempts.append(f"{esc.profile.adapter_id}: escalation supplier not eligible ({'; '.join(reasons)})")
 
@@ -260,13 +335,23 @@ class ControlPlane:
         return stop("failed", str(verdict.rclass), why, detail, route.mode, gate=verdict)
 
     def _attempt(self, adapter: Adapter, contract: Contract, request: Request, leased: dict, route: Route, why: str,
-                 verdict: GateResult, attempts: list[str], escalation: bool = False) -> Response | None:
+                 verdict: GateResult, attempts: list[str], escalation: bool = False,
+                 effectful: bool = False) -> Response | _Unknown | None:
+        """Try one supplier. ``None`` means it certainly did nothing, so the next one may be tried.
+
+        With ``effectful`` (see :func:`has_lasting_effect`), an error other than :class:`DefiniteFailure`, an
+        invalid output, or a confidence below a cascade threshold means the supplier may have acted, and the
+        attempt returns :class:`_Unknown` instead of letting the caller fail over (issue #27).
+        """
         aid = adapter.profile.adapter_id
         trace = request.trace_id
         try:
             result = adapter.call(dict(leased), request)
-        except Exception as exc:  # a supplier failure triggers failover, never a crash
+        except Exception as exc:  # a supplier failure never crashes the call
             detail = str(exc) if self.store_values else type(exc).__name__
+            if effectful and not isinstance(exc, DefiniteFailure):
+                self.log.append("attempt", trace, adapter=aid, outcome="unknown", detail=detail)
+                return _Unknown(adapter, f"no confirmed reply ({detail})")
             attempts.append(f"{aid}: error ({detail})")
             self.log.append("attempt", trace, adapter=aid, outcome="error", detail=detail)
             return None
@@ -274,8 +359,11 @@ class ControlPlane:
         if contract.evidence_required and not result.evidence:
             problems.append("evidence required but none returned")
         if problems:
-            adapter.forget(dict(leased), request)
+            adapter.forget(dict(leased), request)  # so a retry with the same key reaches the supplier again
             shown = problems if self.store_values else [p.split(":")[0] + ": invalid" for p in problems]
+            if effectful:
+                self.log.append("attempt", trace, adapter=aid, outcome="unknown", detail=shown)
+                return _Unknown(adapter, f"invalid output ({'; '.join(shown)})")
             attempts.append(f"{aid}: invalid output ({'; '.join(shown)})")
             self.log.append("attempt", trace, adapter=aid, outcome="invalid", detail=shown)
             return None
@@ -284,6 +372,9 @@ class ControlPlane:
         if route.mode == "cascade" and not escalation and not human and threshold is not None \
                 and (result.confidence is None or result.confidence < threshold):
             adapter.forget(dict(leased), request)
+            if effectful:
+                self.log.append("attempt", trace, adapter=aid, outcome="unknown", confidence=result.confidence)
+                return _Unknown(adapter, f"confidence {result.confidence} below {threshold}")
             attempts.append(f"{aid}: confidence {result.confidence} below {threshold}")
             self.log.append("attempt", trace, adapter=aid, outcome="low_confidence", confidence=result.confidence)
             return None

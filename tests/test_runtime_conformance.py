@@ -16,7 +16,7 @@ import pytest
 
 from opcp._io import ValidationFailed
 from opcp._paths import data_dir
-from opcp.adapter import Adapter, AdapterResult, SupplierProfile
+from opcp.adapter import Adapter, AdapterResult, DefiniteFailure, SupplierProfile
 from opcp.contract import Contract, load_catalogue
 from opcp.gate import Approval, AuthorityGate
 from opcp.rclass import RClass
@@ -47,7 +47,9 @@ class Scripted(Adapter):
     def invoke(self, payload, request):
         self.received.append(json.loads(json.dumps(payload)))
         if self.behaviour.get("error"):
-            raise RuntimeError("scripted definite failure")
+            raise DefiniteFailure("scripted definite failure")
+        if self.behaviour.get("timeout"):  # the supplier acted, but its reply never arrived
+            raise TimeoutError("scripted lost reply")
         r = self.behaviour["respond"]
         return AdapterResult(r["output"], r.get("evidence", []), r.get("confidence"), r.get("cost"))
 

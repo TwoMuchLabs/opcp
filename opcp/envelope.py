@@ -67,6 +67,9 @@ class Response:
     supplier_id: str | None = None
     adapter_version: str | None = None
     error: str | None = None
+    # "unknown" when a supplier may have acted but the call could not be confirmed (issue #27);
+    # ``supplier_id`` then names the supplier to reconcile with.
+    outcome: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -93,4 +96,6 @@ class Response:
             doc["supplier"] = {"id": self.supplier_id, "adapter_version": self.adapter_version or "unknown"}
         if self.error is not None:
             doc["error"] = self.error
+        if self.outcome is not None:
+            doc["outcome"] = self.outcome
         return doc
