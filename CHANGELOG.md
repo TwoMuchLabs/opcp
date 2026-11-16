@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Specification (normative, RFC open until 30 Nov 2026): unknown outcomes.** New section 9.5 and rules in 7.1, 7.2, 8.7, 10.4 and 13. An adapter distinguishes a definite failure from an unknown outcome; for a call with a lasting effect (R2 and above, `transact`, `notify`), a runtime never invokes a second supplier after an unknown outcome, returns `failed` with `outcome: unknown` and the supplier that may have acted, sends a retry with the same key back to that supplier, and keeps the budget unit. The response schema gains `outcome`. Open question 7 asks whether deployments need a configurable reconciliation step.
+
 ## 0.3.2 (draft) — 2026-11-16
 
 Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, hardening, idempotency that survives a restart, and BIAN v14 mappings for the catalogue.
@@ -15,7 +19,6 @@ Red-team round 2 (16 Nov 2026). Two security fixes, three correctness fixes, har
 - **Industry taxonomy mappings** (#2, `docs/TAXONOMIES.md`). A mapping can now give a scheme `version`, a `relation` (exact, closest or partial) and a `note`, and processes in answers and assessment files can carry mappings too. Every catalogue entry now maps to a BIAN v14.0 service domain, linked to that domain's semantic API file at a fixed commit. APQC PCF mappings are left empty until checked against the PCF download.
 - The specification records which external schemes may be bundled and which may only be referenced, and names BPMN 2.0 as the intended import format and OCEL 2.0 as the export format.
 
-- **Specification (normative, RFC open until 30 Nov 2026): unknown outcomes.** New section 9.5 and rules in 7.1, 7.2, 8.7, 10.4 and 13. An adapter distinguishes a definite failure from an unknown outcome; for a call with a lasting effect (R2 and above, `transact`, `notify`), a runtime never invokes a second supplier after an unknown outcome, returns `failed` with `outcome: unknown` and the supplier that may have acted, sends a retry with the same key back to that supplier, and keeps the budget unit. The response schema gains `outcome`. Open question 7 asks whether deployments need a configurable reconciliation step.
 
 ### Changes you may need to make
 
