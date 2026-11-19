@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 448" role="img" aria-label="Lease, gate and route run inside the firm before any supplier is called" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a8a85"/></marker></defs>
+  <rect width="760" height="448" fill="#ffffff"/>
+  <text x="24" y="32" font-size="15" font-weight="600" fill="#1a1a18">Lease, gate and route run inside the firm before any supplier is called</text>
+  <rect x="160" y="56" width="376" height="296" rx="8" fill="#e6eef9" stroke="#2f6fd0" stroke-width="2"/>
+  <text x="176" y="80" font-weight="600" fill="#1a1a18">Control plane, owned by the business</text>
+  <rect x="568" y="56" width="168" height="296" rx="8" fill="none" stroke="#8a8a85" stroke-width="1.25"/>
+  <text x="584" y="80" font-weight="600" fill="#1a1a18">Suppliers, rented</text>
+  <text x="584" y="100" font-size="11.5" fill="#5f5f5a">see leased input only</text>
+  <g fill="#ffffff" stroke="#8a8a85" stroke-width="1.25">
+    <rect x="584" y="120" width="136" height="44" rx="8"/><rect x="584" y="184" width="136" height="44" rx="8"/><rect x="584" y="248" width="136" height="44" rx="8"/>
+    <rect x="24" y="96" width="112" height="48" rx="8"/>
+    <rect x="176" y="96" width="344" height="48" rx="8" fill="none"/><rect x="176" y="160" width="344" height="48" rx="8" fill="none"/><rect x="176" y="224" width="344" height="48" rx="8" fill="none"/><rect x="176" y="288" width="344" height="48" rx="8" fill="none"/>
+  </g>
+  <g text-anchor="middle" fill="#1a1a18"><text x="652" y="146">Vendor</text><text x="652" y="210">Internal system</text><text x="652" y="274">Human team</text><text x="80" y="116" font-weight="600">Process step</text><text x="80" y="134" font-size="11.5" fill="#5f5f5a">one capability</text></g>
+  <g fill="none" stroke="#8a8a85" stroke-width="1.25"><path d="M136 120H176" marker-end="url(#a)"/><path d="M348 144V160" marker-end="url(#a)"/><path d="M348 208V224" marker-end="url(#a)"/><path d="M348 272V288" marker-end="url(#a)"/><path d="M520 312H568" marker-end="url(#a)"/><path d="M348 352V376" marker-end="url(#a)"/></g>
+  <g fill="#1a1a18" font-weight="600"><text x="192" y="116">1 Context lease</text><text x="192" y="180">2 Authority gate</text><text x="192" y="244">3 Eligibility</text><text x="192" y="308">4 Selection</text></g>
+  <g fill="#5f5f5a" font-size="11.5"><text x="192" y="134">per the contract: undeclared fields are withheld</text><text x="192" y="198">authority policy: R0 to R4, budgets, approvers</text><text x="192" y="262">route, stage 1: seven hard filters, never scored</text><text x="192" y="326">route, stage 2: one of five modes picks a survivor</text></g>
+  <rect x="24" y="376" width="712" height="48" rx="8" fill="#eeeeea" stroke="#8a8a85" stroke-width="1.25"/>
+  <text x="380" y="405" text-anchor="middle" fill="#1a1a18">Event log, owned: every request, gate decision, route decision and response</text>
+</svg>
